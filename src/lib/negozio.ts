@@ -36,11 +36,20 @@ export const NEGOZIO = {
 } as const;
 
 const { lat, lng } = NEGOZIO.coordinate;
+const queryIndirizzo = encodeURIComponent(
+  `${NEGOZIO.indirizzo.via}, ${NEGOZIO.indirizzo.cap} ${NEGOZIO.indirizzo.citta} ${NEGOZIO.indirizzo.provincia}`,
+);
 
 /** Link utili per la mappa e le indicazioni. */
 export const MAPPA = {
   /** Apri la mappa OSM a tutto schermo. */
   apriOsm: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=18/${lat}/${lng}`,
-  /** Indicazioni stradali: apre l'app mappe (Google) su mobile e desktop. */
-  indicazioni: `https://www.google.com/maps/dir/?api=1&destination=${lat}%2C${lng}`,
+  /**
+   * Indicazioni stradali (Google). Usiamo l'INDIRIZZO testuale, non le
+   * coordinate: passando le coordinate Google le aggancia al civico piu vicino
+   * del suo database (qui "179"), mentre col testo instrada al 169/C ufficiale.
+   * Fix definitivo per l'etichetta: registrare l'attivita su Google Business
+   * Profile, cosi le indicazioni puntano al luogo verificato.
+   */
+  indicazioni: `https://www.google.com/maps/dir/?api=1&destination=${queryIndirizzo}`,
 } as const;
