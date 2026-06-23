@@ -16,11 +16,11 @@ const nextConfig: NextConfig = {
     qualities: [75],
   },
   experimental: {
-    // L'upload foto passa da una Server Action: alziamo il limite del body
-    // (default 1MB) in linea col limite del bucket (5MB), per non far fallire
-    // gli upload di immagini un po' piu pesanti dopo la compressione.
+    // L'upload foto passa da una Server Action. Il flusso "Genera da foto" puo
+    // inviare piu immagini in un'unica richiesta (prodotto + etichetta), quindi
+    // alziamo il limite del body per non farle rigettare al confine del framework.
     serverActions: {
-      bodySizeLimit: "5mb",
+      bodySizeLimit: "12mb",
     },
   },
 };

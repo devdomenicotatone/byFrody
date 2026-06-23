@@ -66,6 +66,15 @@ function mappaErroreProdotto(error: {
   if (error.code === "23505") {
     return { errors: { slug: "Questo slug e gia in uso da un altro prodotto." } };
   }
+  // 23503 = foreign_key_violation: categoria_id che non esiste piu (es. categoria
+  // cancellata tra il render del form e il submit).
+  if (error.code === "23503") {
+    return {
+      errors: {
+        generale: "La categoria selezionata non esiste piu. Aggiorna la pagina e riprova.",
+      },
+    };
+  }
   return { errors: { generale: error.message } };
 }
 
@@ -85,11 +94,15 @@ export async function salvaProdottoAction(
   const nome = String(formData.get("nome") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim();
   const descrizione = String(formData.get("descrizione") ?? "").trim();
+  const categoriaIdRaw = String(formData.get("categoria_id") ?? "").trim();
+  const categoriaId = categoriaIdRaw || null;
   const prezzoCents = Number.parseInt(
     String(formData.get("prezzo_cents") ?? ""),
     10,
   );
   const attivo = formData.get("attivo") === "true";
+  const disponibilitaSuRichiesta =
+    formData.get("disponibilita_su_richiesta") === "true";
 
   const errors: NonNullable<StatoForm["errors"]> = {};
   if (!nome) errors.nome = "Il nome e obbligatorio.";
@@ -105,8 +118,10 @@ export async function salvaProdottoAction(
     nome,
     slug,
     descrizione: descrizione || null,
+    categoria_id: categoriaId,
     prezzo_cents: prezzoCents,
     attivo,
+    disponibilita_su_richiesta: disponibilitaSuRichiesta,
   };
 
   let nuovoId = id;
@@ -275,86 +290,218 @@ export async function salvaVariantiAction(
   }
 }
 
-/**
- * Carica/sostituisce la foto del prodotto su Supabase Storage.
- * Naming deterministico `<prodottoId>/cover.webp` con upsert: niente file
- * orfani e nessun cleanup fragile. Alla public URL aggiunge `?v=<ts>` per
- * bustare la cache della CDN (la url e deterministica).
- * Accetta SOLO WebP: l'uploader converte sempre lato client, cosi il file
- * salvato (estensione .webp + content-type) e sempre coerente.
- */
-export async function caricaFotoAction(
+// ===========================================================================
+// GALLERIA FOTO (prodotto_foto) — piu foto per prodotto, associabili a un colore.
+// Convenzione: la COPERTINA (prodotti.immagine_url) e sempre la prima foto della
+// galleria (ordine piu basso), tenuta in sync ad ogni mutazione.
+// ===========================================================================
+
+/** Una foto della galleria come persistita a DB. */
+export interface FotoGalleriaRow {
+  id: string;
+  prodotto_id: string;
+  variante_id: string | null;
+  /** Colore rappresentato dalla foto (testo, dalla palette). null = generica. */
+  colore: string | null;
+  url: string;
+  ordine: number;
+}
+
+/** Esito delle azioni galleria: ritorna lo stato canonico per riallineare il client. */
+export interface EsitoGalleria {
+  ok: boolean;
+  error?: string;
+  foto?: FotoGalleriaRow[];
+}
+
+/** Estrae il path Storage (`<prodottoId>/<file>`) dalla public URL. */
+function storagePathDaUrl(url: string): string | null {
+  const marker = "/prodotti/";
+  const i = url.indexOf(marker);
+  if (i === -1) return null;
+  return url.slice(i + marker.length).split("?")[0];
+}
+
+type SupabaseClient = Awaited<
+  ReturnType<typeof verifySession>
+> extends infer S
+  ? S extends { supabase: infer C }
+    ? C
+    : never
+  : never;
+
+async function leggiGalleria(
+  supabase: SupabaseClient,
+  prodottoId: string,
+): Promise<FotoGalleriaRow[]> {
+  const { data, error } = await supabase
+    .from("prodotto_foto")
+    .select("id, prodotto_id, variante_id, colore, url, ordine")
+    .eq("prodotto_id", prodottoId)
+    .order("ordine", { ascending: true });
+  // Distinguere read-fallita da galleria-vuota: un throw evita di azzerare la
+  // copertina (sincronizzaCopertina) su un errore transitorio. Lo catturano i
+  // try/catch delle action, che ritornano ok:false.
+  if (error) throw error;
+  return (data as FotoGalleriaRow[] | null) ?? [];
+}
+
+/** Copertina = prima foto della galleria (o null se vuota). */
+async function sincronizzaCopertina(
+  supabase: SupabaseClient,
+  prodottoId: string,
+  foto: FotoGalleriaRow[],
+): Promise<void> {
+  await supabase
+    .from("prodotti")
+    .update({ immagine_url: foto[0]?.url ?? null })
+    .eq("id", prodottoId);
+}
+
+function revalidaProdotto(prodottoId: string): void {
+  revalidatePath("/gestore/prodotti");
+  revalidatePath(`/gestore/prodotti/${prodottoId}`);
+  revalidatePath("/");
+  revalidatePath("/prodotti/[slug]", "page");
+}
+
+/** Carica una foto WebP nella galleria del prodotto (in coda). */
+export async function aggiungiFotoGalleriaAction(
   prodottoId: string,
   formData: FormData,
-): Promise<{ url?: string; error?: string }> {
+): Promise<EsitoGalleria> {
   const sessione = await verifySession();
-  if (!sessione) return { error: "Non autorizzato." };
+  if (!sessione) return { ok: false, error: "Non autorizzato." };
   const { supabase } = sessione;
 
   const file = formData.get("foto");
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Nessun file selezionato." };
+    return { ok: false, error: "Nessun file selezionato." };
   }
   if (file.type !== "image/webp") {
-    return { error: "Formato non valido: l'immagine va convertita in WebP." };
+    return { ok: false, error: "Formato non valido: l'immagine va convertita in WebP." };
   }
 
-  const path = `${prodottoId}/cover.webp`;
+  const path = `${prodottoId}/${crypto.randomUUID()}.webp`;
   try {
     const { error: up } = await supabase.storage
       .from("prodotti")
-      .upload(path, file, { upsert: true, contentType: "image/webp" });
-    if (up) return { error: up.message };
+      .upload(path, file, { upsert: false, contentType: "image/webp" });
+    if (up) return { ok: false, error: up.message };
 
     const { data } = supabase.storage.from("prodotti").getPublicUrl(path);
     const url = `${data.publicUrl}?v=${Date.now()}`;
 
-    const { error: dbErr } = await supabase
-      .from("prodotti")
-      .update({ immagine_url: url })
-      .eq("id", prodottoId);
-    if (dbErr) return { error: dbErr.message };
+    const attuali = await leggiGalleria(supabase, prodottoId);
+    const ordine = attuali.length
+      ? Math.max(...attuali.map((f) => f.ordine)) + 1
+      : 0;
 
-    revalidatePath("/gestore/prodotti");
-    revalidatePath(`/gestore/prodotti/${prodottoId}`);
-    revalidatePath("/");
-    revalidatePath("/prodotti/[slug]", "page");
-    return { url };
+    const { error: ins } = await supabase
+      .from("prodotto_foto")
+      .insert({ prodotto_id: prodottoId, variante_id: null, colore: null, url, ordine });
+    if (ins) {
+      // rollback del file appena caricato per non lasciare orfani
+      await supabase.storage.from("prodotti").remove([path]);
+      return { ok: false, error: ins.message };
+    }
+
+    const foto = await leggiGalleria(supabase, prodottoId);
+    await sincronizzaCopertina(supabase, prodottoId, foto);
+    revalidaProdotto(prodottoId);
+    return { ok: true, foto };
   } catch {
-    return { error: "Errore di rete durante il caricamento." };
+    return { ok: false, error: "Errore di rete durante il caricamento." };
   }
 }
 
-/** Rimuove la foto del prodotto (file su Storage + immagine_url a null). */
-export async function rimuoviFotoAction(
+/** Rimuove una foto dalla galleria (riga DB + file Storage). */
+export async function rimuoviFotoGalleriaAction(
   prodottoId: string,
-): Promise<EsitoAzione> {
+  fotoId: string,
+): Promise<EsitoGalleria> {
   const sessione = await verifySession();
   if (!sessione) return { ok: false, error: "Non autorizzato." };
   const { supabase } = sessione;
 
   try {
-    // Svuota la cartella del prodotto (lo Storage non conosce il DB).
-    const { data: files } = await supabase.storage
-      .from("prodotti")
-      .list(prodottoId);
-    if (files && files.length > 0) {
-      await supabase.storage
-        .from("prodotti")
-        .remove(files.map((f) => `${prodottoId}/${f.name}`));
-    }
+    const { data: riga } = await supabase
+      .from("prodotto_foto")
+      .select("id, url")
+      .eq("id", fotoId)
+      .eq("prodotto_id", prodottoId)
+      .maybeSingle();
+    if (!riga) return { ok: false, error: "Foto non trovata." };
 
+    const { error: del } = await supabase
+      .from("prodotto_foto")
+      .delete()
+      .eq("id", fotoId)
+      .eq("prodotto_id", prodottoId);
+    if (del) return { ok: false, error: del.message };
+
+    // Pulizia Storage best-effort (un orfano e innocuo, non blocca).
+    const path = storagePathDaUrl(riga.url as string);
+    if (path) await supabase.storage.from("prodotti").remove([path]);
+
+    const foto = await leggiGalleria(supabase, prodottoId);
+    await sincronizzaCopertina(supabase, prodottoId, foto);
+    revalidaProdotto(prodottoId);
+    return { ok: true, foto };
+  } catch {
+    return { ok: false, error: "Errore di rete. Riprova." };
+  }
+}
+
+/** Riordina le foto (l'ordine determina anche la copertina = prima). */
+export async function riordinaFotoGalleriaAction(
+  prodottoId: string,
+  idsInOrdine: string[],
+): Promise<EsitoGalleria> {
+  const sessione = await verifySession();
+  if (!sessione) return { ok: false, error: "Non autorizzato." };
+  const { supabase } = sessione;
+
+  try {
+    for (let i = 0; i < idsInOrdine.length; i++) {
+      const { error } = await supabase
+        .from("prodotto_foto")
+        .update({ ordine: i })
+        .eq("id", idsInOrdine[i])
+        .eq("prodotto_id", prodottoId);
+      if (error) return { ok: false, error: error.message };
+    }
+    const foto = await leggiGalleria(supabase, prodottoId);
+    await sincronizzaCopertina(supabase, prodottoId, foto);
+    revalidaProdotto(prodottoId);
+    return { ok: true, foto };
+  } catch {
+    return { ok: false, error: "Errore di rete. Riprova." };
+  }
+}
+
+/** Associa (o scollega) una foto a un COLORE del prodotto. */
+export async function associaColoreFotoAction(
+  prodottoId: string,
+  fotoId: string,
+  colore: string | null,
+): Promise<EsitoGalleria> {
+  const sessione = await verifySession();
+  if (!sessione) return { ok: false, error: "Non autorizzato." };
+  const { supabase } = sessione;
+
+  const coloreNorm = colore?.trim() || null;
+  try {
     const { error } = await supabase
-      .from("prodotti")
-      .update({ immagine_url: null })
-      .eq("id", prodottoId);
+      .from("prodotto_foto")
+      .update({ colore: coloreNorm })
+      .eq("id", fotoId)
+      .eq("prodotto_id", prodottoId);
     if (error) return { ok: false, error: error.message };
 
-    revalidatePath("/gestore/prodotti");
-    revalidatePath(`/gestore/prodotti/${prodottoId}`);
-    revalidatePath("/");
-    revalidatePath("/prodotti/[slug]", "page");
-    return { ok: true };
+    const foto = await leggiGalleria(supabase, prodottoId);
+    revalidaProdotto(prodottoId);
+    return { ok: true, foto };
   } catch {
     return { ok: false, error: "Errore di rete. Riprova." };
   }

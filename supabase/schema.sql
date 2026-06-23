@@ -1,5 +1,5 @@
 -- ============================================================================
--- by Frody - Schema database (PostgreSQL / Supabase)
+-- Borracci Anna - Schema database (PostgreSQL / Supabase)
 -- ----------------------------------------------------------------------------
 -- Esegui questo file nel SQL Editor di Supabase (o via `supabase db push`).
 -- Convenzioni:
@@ -25,8 +25,14 @@ create table if not exists public.prodotti (
   valuta        text not null default 'EUR',
   immagine_url  text,
   attivo        boolean not null default true,
+  -- Magazzino NON in tempo reale: il cliente sceglie colore+taglia e contatta
+  -- il negozio ("Scrivici per la disponibilita"). Vedi migration 20260623160000.
+  disponibilita_su_richiesta boolean not null default true,
   creato_il     timestamptz not null default now()
 );
+-- Idempotente per i DB gia creati (la create-table sopra non aggiunge colonne).
+alter table public.prodotti
+  add column if not exists disponibilita_su_richiesta boolean not null default true;
 
 create index if not exists idx_prodotti_attivo on public.prodotti (attivo);
 
@@ -67,14 +73,31 @@ create index if not exists idx_carrello_righe_carrello on public.carrello_righe 
 create table if not exists public.ordini (
   id                 uuid primary key default gen_random_uuid(),
   stato              text not null default 'in_attesa'
-                       check (stato in ('in_attesa', 'pagato', 'annullato')),
+                       check (stato in ('in_attesa', 'confermato', 'pagato', 'annullato')),
   totale_cents       integer not null check (totale_cents >= 0),
   email              text,
+  -- Dati cliente della richiesta + token pubblico per /ordine/[token].
+  nome               text,
+  telefono           text,
+  note               text,
+  token              text,
+  confermato_il      timestamptz,
   stripe_session_id  text unique,
   creato_il          timestamptz not null default now()
 );
+-- Idempotente per i DB gia creati. Vedi migration 20260623180000.
+alter table public.ordini drop constraint if exists ordini_stato_check;
+alter table public.ordini
+  add constraint ordini_stato_check
+  check (stato in ('in_attesa', 'confermato', 'pagato', 'annullato'));
+alter table public.ordini add column if not exists nome text;
+alter table public.ordini add column if not exists telefono text;
+alter table public.ordini add column if not exists note text;
+alter table public.ordini add column if not exists token text;
+alter table public.ordini add column if not exists confermato_il timestamptz;
 
 create index if not exists idx_ordini_stato on public.ordini (stato);
+create unique index if not exists idx_ordini_token on public.ordini (token);
 
 -- Righe d'ordine (snapshot dei prezzi al momento dell'acquisto) --------------
 create table if not exists public.ordine_righe (
@@ -85,9 +108,14 @@ create table if not exists public.ordine_righe (
   -- snapshot denormalizzato: il nome/prezzo restano anche se il catalogo cambia.
   nome_prodotto   text not null,
   sku             text,
+  taglia          text,
+  colore          text,
   prezzo_cents    integer not null check (prezzo_cents >= 0),
   quantita        integer not null check (quantita > 0)
 );
+-- Idempotente per i DB gia creati. Vedi migration 20260623180000.
+alter table public.ordine_righe add column if not exists taglia text;
+alter table public.ordine_righe add column if not exists colore text;
 
 create index if not exists idx_ordine_righe_ordine on public.ordine_righe (ordine_id);
 
@@ -364,3 +392,117 @@ drop policy if exists "prodotti_storage_delete_gestore" on storage.objects;
 create policy "prodotti_storage_delete_gestore"
   on storage.objects for delete to authenticated
   using ( bucket_id = 'prodotti' and public.is_gestore() );
+
+-- ============================================================================
+-- CATEGORIE + GALLERIA FOTO
+-- ----------------------------------------------------------------------------
+-- Stesso contenuto della migration 20260623120000_categorie_galleria.sql.
+-- ============================================================================
+
+-- Categorie (lista gestibile dal pannello) + seed Polo/Coreane.
+create table if not exists public.categorie (
+  id         uuid primary key default gen_random_uuid(),
+  slug       text not null unique,
+  nome       text not null,
+  parent_id  uuid references public.categorie (id) on delete set null,
+  ordine     integer not null default 0,
+  creato_il  timestamptz not null default now()
+);
+-- Per DB gia esistenti: aggiunge parent_id se la tabella c'era senza.
+alter table public.categorie
+  add column if not exists parent_id uuid
+    references public.categorie (id) on delete set null;
+create index if not exists idx_categorie_ordine on public.categorie (ordine);
+create index if not exists idx_categorie_parent on public.categorie (parent_id);
+alter table public.categorie enable row level security;
+
+drop policy if exists "categorie_lettura_pubblica" on public.categorie;
+create policy "categorie_lettura_pubblica"
+  on public.categorie for select
+  using ( true );
+
+drop policy if exists "categorie_insert_gestore" on public.categorie;
+create policy "categorie_insert_gestore"
+  on public.categorie for insert to authenticated
+  with check ( public.is_gestore() );
+
+drop policy if exists "categorie_update_gestore" on public.categorie;
+create policy "categorie_update_gestore"
+  on public.categorie for update to authenticated
+  using ( public.is_gestore() ) with check ( public.is_gestore() );
+
+drop policy if exists "categorie_delete_gestore" on public.categorie;
+create policy "categorie_delete_gestore"
+  on public.categorie for delete to authenticated
+  using ( public.is_gestore() );
+
+insert into public.categorie (slug, nome, ordine)
+values
+  ('uomo',    'Uomo',    1),
+  ('donna',   'Donna',   2),
+  ('polo',    'Polo',    1),
+  ('coreane', 'Coreane', 2)
+on conflict (slug) do nothing;
+
+-- Gerarchia: Polo e Coreane sotto la macro UOMO (solo se senza genitore).
+update public.categorie
+  set parent_id = (select id from public.categorie where slug = 'uomo')
+  where slug in ('polo', 'coreane')
+    and parent_id is null;
+
+-- Riferimento categoria sul prodotto (set null on delete).
+alter table public.prodotti
+  add column if not exists categoria_id uuid
+    references public.categorie (id) on delete set null;
+create index if not exists idx_prodotti_categoria on public.prodotti (categoria_id);
+
+-- Galleria foto del prodotto. La foto segue un COLORE (testo): resta legata al
+-- colore anche quando le varianti vengono rigenerate (solo colore -> colore x
+-- taglia). `variante_id` resta per compatibilita ma non e piu il riferimento.
+create table if not exists public.prodotto_foto (
+  id           uuid primary key default gen_random_uuid(),
+  prodotto_id  uuid not null references public.prodotti (id) on delete cascade,
+  variante_id  uuid references public.varianti (id) on delete set null,
+  colore       text,
+  url          text not null,
+  ordine       integer not null default 0,
+  creato_il    timestamptz not null default now()
+);
+-- Idempotente per i DB gia creati. Vedi migration 20260623160000.
+alter table public.prodotto_foto
+  add column if not exists colore text;
+create index if not exists idx_prodotto_foto_prodotto
+  on public.prodotto_foto (prodotto_id, ordine);
+create index if not exists idx_prodotto_foto_variante
+  on public.prodotto_foto (variante_id);
+alter table public.prodotto_foto enable row level security;
+
+drop policy if exists "prodotto_foto_lettura_pubblica" on public.prodotto_foto;
+create policy "prodotto_foto_lettura_pubblica"
+  on public.prodotto_foto for select
+  using (
+    exists (
+      select 1 from public.prodotti p
+      where p.id = prodotto_foto.prodotto_id and p.attivo = true
+    )
+  );
+
+drop policy if exists "prodotto_foto_lettura_gestore" on public.prodotto_foto;
+create policy "prodotto_foto_lettura_gestore"
+  on public.prodotto_foto for select to authenticated
+  using ( public.is_gestore() );
+
+drop policy if exists "prodotto_foto_insert_gestore" on public.prodotto_foto;
+create policy "prodotto_foto_insert_gestore"
+  on public.prodotto_foto for insert to authenticated
+  with check ( public.is_gestore() );
+
+drop policy if exists "prodotto_foto_update_gestore" on public.prodotto_foto;
+create policy "prodotto_foto_update_gestore"
+  on public.prodotto_foto for update to authenticated
+  using ( public.is_gestore() ) with check ( public.is_gestore() );
+
+drop policy if exists "prodotto_foto_delete_gestore" on public.prodotto_foto;
+create policy "prodotto_foto_delete_gestore"
+  on public.prodotto_foto for delete to authenticated
+  using ( public.is_gestore() );

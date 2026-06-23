@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* =========================================================================
-   by Frody — design system "Pop mare"
+   Borracci Anna — design system "Pop mare"
    Negozio di abbigliamento sul lungomare di Rimini.
    Palette solare e balneare: blu mare, ciano laguna, corallo, giallo sole.
 
@@ -76,8 +76,8 @@ h3 {
 }
 
 /* -------------------------------------------------------------------------
-   Wordmark "by Frody": "by" piccolo blu mare, "Frody" con la F corallo marcata.
-   Markup: <span class="wordmark"><span class="wm-by">by</span><span class="wm-frody">Frody</span></span>
+   Wordmark "Borracci Anna": "Borracci" blu mare, "Anna" corallo — due tinte del brand.
+   Markup: <span class="wordmark"><span class="wm-lead">Borracci</span><span class="wm-accent">Anna</span></span>
    ------------------------------------------------------------------------- */
 .wordmark {
   font-family: var(--font-display), sans-serif;
@@ -86,21 +86,14 @@ h3 {
   line-height: 1;
   display: inline-flex;
   align-items: baseline;
-  gap: 0.06em;
+  gap: 0.28em;
   color: var(--foreground);
 }
-.wordmark .wm-by {
+.wordmark .wm-lead {
   color: var(--sea);
-  font-weight: 600;
-  font-size: 0.74em;
 }
-.wordmark .wm-frody {
-  position: relative;
-}
-.wordmark .wm-frody::first-letter {
+.wordmark .wm-accent {
   color: var(--coral);
-  font-weight: 800;
-  font-size: 1.18em;
 }
 
 /* -------------------------------------------------------------------------

@@ -24,7 +24,7 @@ export function getStripe(): Stripe {
 
   _stripe = new Stripe(secretKey, {
     typescript: true,
-    appInfo: { name: "by Frody" },
+    appInfo: { name: "Borracci Anna" },
   });
 
   return _stripe;

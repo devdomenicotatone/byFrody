@@ -12,6 +12,7 @@ interface RigaProdottoGrezza {
   valuta: string;
   immagine_url: string | null;
   attivo: boolean;
+  disponibilita_su_richiesta: boolean;
   creato_il: string;
   varianti: { stock: number }[] | null;
 }
@@ -24,7 +25,7 @@ export default async function ProdottiPage() {
   const { data } = await supabase
     .from("prodotti")
     .select(
-      "id, slug, nome, prezzo_cents, valuta, immagine_url, attivo, creato_il, varianti(stock)",
+      "id, slug, nome, prezzo_cents, valuta, immagine_url, attivo, disponibilita_su_richiesta, creato_il, varianti(stock)",
     )
     .order("creato_il", { ascending: false })
     .limit(200);
@@ -38,6 +39,7 @@ export default async function ProdottiPage() {
     valuta: p.valuta,
     immagine_url: p.immagine_url,
     attivo: p.attivo,
+    suRichiesta: p.disponibilita_su_richiesta,
     numVarianti: p.varianti?.length ?? 0,
     stockTotale: (p.varianti ?? []).reduce((s, v) => s + (v.stock ?? 0), 0),
   }));

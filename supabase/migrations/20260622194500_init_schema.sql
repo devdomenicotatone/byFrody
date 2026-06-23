@@ -1,5 +1,5 @@
 -- ============================================================================
--- by Frody - Schema database (PostgreSQL / Supabase)
+-- Borracci Anna - Schema database (PostgreSQL / Supabase)
 -- ----------------------------------------------------------------------------
 -- Esegui questo file nel SQL Editor di Supabase (o via `supabase db push`).
 -- Convenzioni:

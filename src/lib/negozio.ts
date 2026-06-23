@@ -5,7 +5,7 @@
 
 export const NEGOZIO = {
   /** Insegna commerciale. */
-  insegna: "by Frody",
+  insegna: "Borracci Anna",
   /** Ragione sociale / titolare (impresa individuale). */
   ragioneSociale: "Borracci Anna",
   formaGiuridica: "Impresa individuale",
@@ -25,6 +25,14 @@ export const NEGOZIO = {
 
   /** Contatto cliente. */
   email: "1.domenicotatone@gmail.com",
+  /**
+   * Numero WhatsApp in formato internazionale SENZA "+" ne spazi (es.
+   * "393331234567"). Lascia "" per nascondere il bottone WhatsApp finche non
+   * c'e un numero. Tipato `string` cosi il bottone si attiva appena lo compili.
+   */
+  whatsapp: "393917395716" as string,
+  /** Numero di telefono mostrabile (es. "+39 333 123 4567"). "" = nascosto. */
+  telefono: "+39 391 739 5716" as string,
   /** Domicilio digitale (PEC) da visura. */
   pec: "borraccianna@pec.it",
 

@@ -17,6 +17,7 @@ export interface ProdottoLista {
   valuta: string;
   immagine_url: string | null;
   attivo: boolean;
+  suRichiesta: boolean;
   numVarianti: number;
   stockTotale: number;
 }
@@ -72,12 +73,20 @@ export default function ListaProdotti({
             Prodotti
           </h1>
         </div>
-        <Link
-          href="/gestore/prodotti/nuovo"
-          className="inline-flex h-11 items-center gap-1.5 rounded-full bg-sea px-5 font-display text-sm font-bold text-white shadow-sea transition-all hover:-translate-y-0.5"
-        >
-          + Nuovo
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/gestore/prodotti/genera"
+            className="inline-flex h-11 items-center gap-1.5 rounded-full bg-white px-4 font-display text-sm font-bold text-sea ring-2 ring-sea transition-all hover:-translate-y-0.5 hover:bg-surface"
+          >
+            ✨ Genera
+          </Link>
+          <Link
+            href="/gestore/prodotti/nuovo"
+            className="inline-flex h-11 items-center gap-1.5 rounded-full bg-sea px-5 font-display text-sm font-bold text-white shadow-sea transition-all hover:-translate-y-0.5"
+          >
+            + Nuovo
+          </Link>
+        </div>
       </div>
 
       {/* Toolbar: ricerca + filtro */}
@@ -153,6 +162,7 @@ export default function ListaProdotti({
                     <BadgeStock
                       stock={p.stockTotale}
                       numVarianti={p.numVarianti}
+                      suRichiesta={p.suRichiesta}
                     />
                   </div>
                 </div>
@@ -206,14 +216,36 @@ function Miniatura({ url, nome }: { url: string | null; nome: string }) {
 function BadgeStock({
   stock,
   numVarianti,
+  suRichiesta,
 }: {
   stock: number;
   numVarianti: number;
+  suRichiesta: boolean;
 }) {
   if (numVarianti === 0) {
     return (
       <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-muted">
         Nessuna variante
+      </span>
+    );
+  }
+  // Magazzino non in tempo reale: niente conteggio, solo "su richiesta".
+  if (suRichiesta) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-bold text-sea">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-3 w-3"
+          aria-hidden="true"
+        >
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+        Su richiesta
       </span>
     );
   }

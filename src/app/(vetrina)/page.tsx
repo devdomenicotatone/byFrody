@@ -1,4 +1,4 @@
-// Vetrina "by Frody": griglia dei prodotti attivi.
+// Vetrina "Borracci Anna": griglia dei prodotti attivi.
 // Legge da Supabase lato server; se le env mancano, la query fallisce o non
 // ci sono prodotti, degrada con grazia mostrando alcuni prodotti di esempio
 // hardcoded cosi la pagina rende SEMPRE (anche in build senza env).
@@ -129,7 +129,7 @@ export default async function Home() {
             id="hero-title"
             className="mt-4 max-w-[14ch] font-display text-[clamp(2.3rem,9vw,4.4rem)] font-extrabold leading-[1.05] [text-shadow:0_6px_24px_rgba(0,57,99,.35)]"
           >
-            L&apos;estate si veste da Frody.
+            L&apos;estate si veste da Borracci Anna.
           </h1>
           <p className="mt-3.5 max-w-[46ch] text-base text-white/95 sm:text-lg">
             Capi freschi e leggeri, scelti uno a uno. Vieni a trovarci sul
@@ -205,8 +205,8 @@ export default async function Home() {
         {prodotti.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-line bg-surface px-6 py-20 text-center shadow-soft">
             <p className="wordmark select-none text-3xl opacity-60">
-              <span className="wm-by">by</span>
-              <span className="wm-frody">Frody</span>
+              <span className="wm-lead">Borracci</span>
+              <span className="wm-accent">Anna</span>
             </p>
             <p className="mt-4 text-sm text-muted">
               La vetrina e in aggiornamento. Torna presto.

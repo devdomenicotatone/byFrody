@@ -5,9 +5,13 @@ import FormProdotto, {
   type ProdottoForm,
 } from "@/components/gestore/FormProdotto";
 import EditorVarianti from "@/components/gestore/EditorVarianti";
-import UploaderFoto from "@/components/gestore/UploaderFoto";
+import GestoreGalleria from "@/components/gestore/GestoreGalleria";
 import EliminaProdotto from "@/components/gestore/EliminaProdotto";
-import type { VarianteSalvata } from "@/lib/gestore/actions";
+import type {
+  VarianteSalvata,
+  FotoGalleriaRow,
+} from "@/lib/gestore/actions";
+import type { Categoria } from "@/lib/types";
 
 // Modifica prodotto. In Next 16 `params` e una Promise: va atteso.
 export default async function ModificaProdottoPage({
@@ -21,7 +25,7 @@ export default async function ModificaProdottoPage({
   const { data } = await supabase
     .from("prodotti")
     .select(
-      "id, nome, slug, descrizione, prezzo_cents, valuta, attivo, immagine_url",
+      "id, nome, slug, descrizione, categoria_id, prezzo_cents, valuta, attivo, disponibilita_su_richiesta, immagine_url",
     )
     .eq("id", id)
     .maybeSingle();
@@ -29,24 +33,46 @@ export default async function ModificaProdottoPage({
   if (!data) notFound();
   const prodotto = data as ProdottoForm & { immagine_url: string | null };
 
+  const { data: catData } = await supabase
+    .from("categorie")
+    .select("id, slug, nome, parent_id, ordine")
+    .order("ordine", { ascending: true });
+  const categorie = (catData as Categoria[] | null) ?? [];
+
   const { data: varData } = await supabase
     .from("varianti")
     .select("id, taglia, colore, sku, stock")
     .eq("prodotto_id", id)
     .order("creato_il", { ascending: true });
   const varianti = (varData as VarianteSalvata[] | null) ?? [];
+  // Colori distinti del prodotto, per associare le foto della galleria.
+  const coloriProdotto = [
+    ...new Set(varianti.map((v) => v.colore).filter((c): c is string => !!c)),
+  ];
+
+  const { data: fotoData } = await supabase
+    .from("prodotto_foto")
+    .select("id, prodotto_id, variante_id, url, ordine")
+    .eq("prodotto_id", id)
+    .order("ordine", { ascending: true });
+  const fotoGalleria = (fotoData as FotoGalleriaRow[] | null) ?? [];
 
   return (
     <div className="pb-28">
       <h1 className="mx-auto mb-5 max-w-xl text-xl font-semibold text-foreground">
         Modifica prodotto
       </h1>
-      <FormProdotto prodotto={prodotto} />
-      <UploaderFoto prodottoId={prodotto.id} urlIniziale={prodotto.immagine_url} />
+      <FormProdotto prodotto={prodotto} categorie={categorie} />
       <EditorVarianti
         prodottoId={prodotto.id}
         slugProdotto={prodotto.slug}
         varianti={varianti}
+        suRichiesta={prodotto.disponibilita_su_richiesta}
+      />
+      <GestoreGalleria
+        prodottoId={prodotto.id}
+        colori={coloriProdotto}
+        fotoIniziali={fotoGalleria}
       />
       <EliminaProdotto id={prodotto.id} nome={prodotto.nome} />
     </div>

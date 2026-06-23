@@ -1,5 +1,5 @@
 -- ============================================================================
--- by Frody - Area Gestore: auth + RLS scrittura catalogo + storage foto.
+-- Borracci Anna - Area Gestore: auth + RLS scrittura catalogo + storage foto.
 -- ----------------------------------------------------------------------------
 -- Migration idempotente. NON modifica ne rimuove le policy pubbliche esistenti:
 -- aggiunge solo nuovi oggetti e policy permissive (combinate in OR sulle SELECT).

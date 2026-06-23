@@ -7,7 +7,7 @@ import Link from "next/link";
 import SvuotaCarrelloAlSuccesso from "@/components/cart/SvuotaCarrelloAlSuccesso";
 
 export const metadata = {
-  title: "Ordine confermato · by Frody",
+  title: "Ordine confermato · Borracci Anna",
 };
 
 export default function CheckoutSuccessoPage() {

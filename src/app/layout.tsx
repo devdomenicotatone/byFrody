@@ -18,9 +18,9 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "by Frody — moda fresca sul lungomare di Rimini",
+  title: "Borracci Anna — moda fresca sul lungomare di Rimini",
   description:
-    "by Frody: abbigliamento fresco e leggero, scelto uno a uno. Vieni a trovarci sul lungomare di Rimini o ricevi i capi comodamente a casa.",
+    "Borracci Anna: abbigliamento fresco e leggero, scelto uno a uno. Vieni a trovarci sul lungomare di Rimini o ricevi i capi comodamente a casa.",
 };
 
 // Root layout MINIMALE: emette solo <html>/<body> + font + metadata globale.

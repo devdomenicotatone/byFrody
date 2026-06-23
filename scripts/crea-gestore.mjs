@@ -26,7 +26,7 @@ function leggiEnv(file) {
   }
 }
 
-const [, , email, password, nome = "Frody"] = process.argv;
+const [, , email, password, nome = "Borracci Anna"] = process.argv;
 if (!email || !password) {
   console.error("Uso: node scripts/crea-gestore.mjs <email> <password> [Nome]");
   process.exit(1);

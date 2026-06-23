@@ -1,4 +1,4 @@
-// Header del sito: wordmark "by Frody", navigazione minimale e link al carrello.
+// Header del sito: wordmark "Borracci Anna", navigazione minimale e link al carrello.
 // Server component: il badge contatore (CartBadge) e un figlio client che legge
 // il CartProvider e si aggiorna in tempo reale a ogni add/rimuovi.
 
@@ -10,11 +10,11 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-surface-2 bg-background/85 backdrop-blur-md backdrop-saturate-150">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
-        {/* Wordmark: "by" blu mare, "Frody" con la F corallo (gestita da .wordmark). */}
-        <Link href="/" aria-label="by Frody — vai alla home" className="group">
+        {/* Wordmark: "Moda" blu mare, "Mare" corallo (gestito da .wordmark). */}
+        <Link href="/" aria-label="Borracci Anna — vai alla home" className="group">
           <span className="wordmark text-2xl">
-            <span className="wm-by">by</span>
-            <span className="wm-frody">Frody</span>
+            <span className="wm-lead">Borracci</span>
+            <span className="wm-accent">Anna</span>
           </span>
         </Link>
 

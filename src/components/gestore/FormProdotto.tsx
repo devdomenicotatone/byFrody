@@ -12,6 +12,7 @@ import Link from "next/link";
 import { salvaProdottoAction, type StatoForm } from "@/lib/gestore/actions";
 import { formatPrezzo, parsePrezzoCents } from "@/lib/format";
 import { slugify } from "@/lib/gestore/slug";
+import type { Categoria } from "@/lib/types";
 
 export interface ProdottoForm {
   id: string;
@@ -21,12 +22,20 @@ export interface ProdottoForm {
   prezzo_cents: number;
   valuta: string;
   attivo: boolean;
+  categoria_id: string | null;
+  disponibilita_su_richiesta: boolean;
 }
 
 const inputCls =
   "h-12 w-full rounded-2xl bg-white px-4 text-base text-foreground ring-1 ring-line outline-none transition-shadow";
 
-export default function FormProdotto({ prodotto }: { prodotto?: ProdottoForm }) {
+export default function FormProdotto({
+  prodotto,
+  categorie = [],
+}: {
+  prodotto?: ProdottoForm;
+  categorie?: Categoria[];
+}) {
   const modifica = !!prodotto;
   const [stato, formAction, pending] = useActionState<StatoForm, FormData>(
     salvaProdottoAction,
@@ -37,10 +46,14 @@ export default function FormProdotto({ prodotto }: { prodotto?: ProdottoForm }) 
   const [slug, setSlug] = useState(prodotto?.slug ?? "");
   const [slugDirty, setSlugDirty] = useState(modifica);
   const [descrizione, setDescrizione] = useState(prodotto?.descrizione ?? "");
+  const [categoriaId, setCategoriaId] = useState(prodotto?.categoria_id ?? "");
   const [prezzoInput, setPrezzoInput] = useState(
     prodotto ? (prodotto.prezzo_cents / 100).toFixed(2).replace(".", ",") : "",
   );
   const [attivo, setAttivo] = useState(prodotto?.attivo ?? true);
+  const [suRichiesta, setSuRichiesta] = useState(
+    prodotto?.disponibilita_su_richiesta ?? true,
+  );
 
   // Gli errori per-campo del server scompaiono appena l'utente ricomincia a
   // modificare (evita messaggi "fantasma" su un valore gia cambiato); tornano
@@ -58,6 +71,19 @@ export default function FormProdotto({ prodotto }: { prodotto?: ProdottoForm }) 
     [prezzoInput],
   );
 
+  // Categorie in gerarchia a 2 livelli: macro (senza parent) con le loro figlie.
+  const categorieRaggruppate = useMemo(() => {
+    const radici = categorie
+      .filter((c) => !c.parent_id)
+      .sort((a, b) => a.ordine - b.ordine);
+    return radici.map((radice) => ({
+      radice,
+      figli: categorie
+        .filter((c) => c.parent_id === radice.id)
+        .sort((a, b) => a.ordine - b.ordine),
+    }));
+  }, [categorie]);
+
   function onNome(v: string) {
     setNome(v);
     setErroriVisibili(false);
@@ -74,8 +100,10 @@ export default function FormProdotto({ prodotto }: { prodotto?: ProdottoForm }) 
     ? nome !== prodotto.nome ||
       slug !== prodotto.slug ||
       (descrizione ?? "") !== (prodotto.descrizione ?? "") ||
+      categoriaId !== (prodotto.categoria_id ?? "") ||
       prezzoCents !== prodotto.prezzo_cents ||
-      attivo !== prodotto.attivo
+      attivo !== prodotto.attivo ||
+      suRichiesta !== prodotto.disponibilita_su_richiesta
     : true;
 
   const errori = erroriVisibili ? (stato.errors ?? {}) : {};
@@ -85,6 +113,11 @@ export default function FormProdotto({ prodotto }: { prodotto?: ProdottoForm }) 
       {modifica && <input type="hidden" name="id" value={prodotto.id} />}
       <input type="hidden" name="prezzo_cents" value={prezzoCents ?? ""} />
       <input type="hidden" name="attivo" value={attivo ? "true" : "false"} />
+      <input
+        type="hidden"
+        name="disponibilita_su_richiesta"
+        value={suRichiesta ? "true" : "false"}
+      />
 
       <div className="flex flex-col gap-5 pb-28">
         <Campo label="Nome" htmlFor="nome" errore={errori.nome}>
@@ -129,6 +162,50 @@ export default function FormProdotto({ prodotto }: { prodotto?: ProdottoForm }) 
             rows={4}
             className="min-h-24 w-full resize-y rounded-2xl bg-white px-4 py-3 text-base text-foreground ring-1 ring-line outline-none transition-shadow"
           />
+        </Campo>
+
+        <Campo label="Categoria" htmlFor="categoria_id">
+          <div className="relative">
+            <select
+              id="categoria_id"
+              name="categoria_id"
+              value={categoriaId}
+              onChange={(e) => setCategoriaId(e.target.value)}
+              className={`${inputCls} appearance-none pr-9`}
+            >
+              <option value="">Nessuna categoria</option>
+              {categorieRaggruppate.map(({ radice, figli }) =>
+                figli.length === 0 ? (
+                  <option key={radice.id} value={radice.id}>
+                    {radice.nome}
+                  </option>
+                ) : (
+                  <optgroup key={radice.id} label={radice.nome}>
+                    <option value={radice.id}>{radice.nome} (tutto)</option>
+                    {figli.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.nome}
+                      </option>
+                    ))}
+                  </optgroup>
+                ),
+              )}
+            </select>
+            <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-muted">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </span>
+          </div>
         </Campo>
 
         <Campo
@@ -183,6 +260,36 @@ export default function FormProdotto({ prodotto }: { prodotto?: ProdottoForm }) 
               className={[
                 "inline-block h-5 w-5 transform rounded-full bg-white shadow-soft transition-transform",
                 attivo ? "translate-x-6" : "translate-x-1",
+              ].join(" ")}
+            />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-soft ring-1 ring-line">
+          <div className="pr-4">
+            <p className="font-display text-sm font-bold text-foreground">
+              Scrivici per la disponibilità
+            </p>
+            <p className="text-xs text-muted">
+              Il cliente sceglie colore e taglia e ti contatta: nessun pagamento
+              online e nessun conteggio del magazzino.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={suRichiesta}
+            aria-label="Scrivici per la disponibilità"
+            onClick={() => setSuRichiesta((v) => !v)}
+            className={[
+              "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors",
+              suRichiesta ? "bg-sea" : "bg-line",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "inline-block h-5 w-5 transform rounded-full bg-white shadow-soft transition-transform",
+                suRichiesta ? "translate-x-6" : "translate-x-1",
               ].join(" ")}
             />
           </button>

@@ -7,8 +7,9 @@
 
 import Link from "next/link";
 
-import CartItem, { CheckoutButton } from "@/components/CartItem";
+import CartItem from "@/components/CartItem";
 import FreeShippingBar from "@/components/cart/FreeShippingBar";
+import ModuloRichiesta from "@/components/cart/ModuloRichiesta";
 import { useCarrello } from "@/components/cart/CartProvider";
 import { formatPrezzo } from "@/lib/format";
 
@@ -42,42 +43,46 @@ export default function CarrelloContenuto() {
           </div>
           <div className="flex items-center justify-between text-sm text-muted">
             <span>Spedizione</span>
-            <span>Calcolata al pagamento</span>
+            <span>Da concordare</span>
           </div>
         </div>
 
         <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
-          <span className="font-display font-bold text-foreground">Totale</span>
+          <span className="font-display font-bold text-foreground">
+            Totale stimato
+          </span>
           <span className="font-display text-2xl font-extrabold text-sea">
             {formatPrezzo(subtotaleCents, valuta)}
           </span>
         </div>
 
-        <div className="mt-6">
-          <CheckoutButton />
+        {/* Come funziona: niente pagamento ora */}
+        <div className="mt-5 flex items-start gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-line">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="mt-0.5 h-5 w-5 flex-none text-sea"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 8v4l2.5 2.5" />
+          </svg>
+          <p className="text-sm text-muted">
+            <span className="font-bold text-foreground">
+              Nessun pagamento ora.
+            </span>{" "}
+            Invii la richiesta, confermiamo la disponibilità di tutti gli
+            articoli e <span className="font-semibold">solo dopo</span> paghi in
+            sicurezza con Stripe.
+          </p>
         </div>
 
-        {/* Trust signals vicino al CTA */}
-        <div className="mt-4 space-y-2">
-          <p className="flex items-center justify-center gap-2 text-xs text-muted">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              className="h-4 w-4 text-sea"
-            >
-              <rect x="5" y="11" width="14" height="10" rx="2" />
-              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-            </svg>
-            Pagamento sicuro gestito da Stripe
-          </p>
-          <p className="text-center text-xs text-muted">
-            Acquisti come ospite, senza registrazione.
-          </p>
+        <div className="mt-5">
+          <ModuloRichiesta />
         </div>
 
         <div className="mt-4 text-center">

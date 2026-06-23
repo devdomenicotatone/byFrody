@@ -1,4 +1,4 @@
-# by Frody
+# Borracci Anna
 
 E-commerce B2C di abbigliamento basics casual. Negozio online minimale:
 vetrina prodotti, pagina prodotto con varianti di taglia, carrello e checkout
@@ -62,7 +62,7 @@ Copia il `whsec_...` stampato in `STRIPE_WEBHOOK_SECRET`.
 ## Struttura cartelle
 
 ```
-byFrody/
+borracci-anna/
 ├─ src/
 │  ├─ app/                      # rotte App Router (pagine + route handler)
 │  │  ├─ page.tsx               # / vetrina

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import FormLogin from "@/components/gestore/FormLogin";
 
 export const metadata: Metadata = {
-  title: "Accesso gestore — by Frody",
+  title: "Accesso gestore — Borracci Anna",
 };
 
 // Pagina di login del gestore. Sta FUORI dalla shell autenticata (il sotto-group
@@ -26,8 +26,8 @@ export default function LoginPage() {
         <div className="rounded-3xl bg-white p-7 shadow-soft sm:p-8">
           <div className="mb-7 text-center">
             <span className="wordmark text-3xl">
-              <span className="wm-by">by</span>
-              <span className="wm-frody">Frody</span>
+              <span className="wm-lead">Borracci</span>
+              <span className="wm-accent">Anna</span>
             </span>
             <p className="mt-2 text-sm font-display font-bold uppercase tracking-wide text-lagoon">
               Area gestore

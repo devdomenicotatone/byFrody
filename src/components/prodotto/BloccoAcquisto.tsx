@@ -1,107 +1,52 @@
 "use client";
 
-// AddToCart - by Frody.
-// Selettore di variante (taglia) + quantita + bottone "Aggiungi al carrello".
-// Delega al CartProvider (aggiungi): bump ottimistico del badge, apertura del
-// mini-cart drawer e toast di esito sono gestiti li, in modo centralizzato.
+// Blocco acquisto (modalita vendita diretta): selettore quantita + bottone
+// "Aggiungi al carrello". La scelta di colore/taglia avviene a monte
+// (ProdottoDettaglio); qui arriva gia la variante risolta. Delega al
+// CartProvider (badge ottimistico, mini-cart, toast gestiti li).
 
 import { useState, useTransition } from "react";
 
 import { useCarrello } from "@/components/cart/CartProvider";
 import type { Prodotto, Variante } from "@/lib/types";
 
-interface AddToCartProps {
-  /** Prodotto a cui appartengono le varianti (per la riga ottimistica). */
+export default function BloccoAcquisto({
+  prodotto,
+  variante,
+}: {
   prodotto: Prodotto;
-  /** Tutte le varianti del prodotto (incluse quelle esaurite, mostrate ma non selezionabili). */
-  varianti: Variante[];
-}
-
-/** Etichetta leggibile di una variante (taglia, con fallback al SKU). */
-function etichettaVariante(v: Variante): string {
-  if (v.taglia && v.colore) return `${v.taglia} - ${v.colore}`;
-  if (v.taglia) return v.taglia;
-  if (v.colore) return v.colore;
-  return v.sku;
-}
-
-export default function AddToCart({ prodotto, varianti }: AddToCartProps) {
+  variante: Variante | null;
+}) {
   const { aggiungi } = useCarrello();
-  const disponibili = varianti.filter((v) => v.stock > 0);
-
-  // Preseleziona la prima variante disponibile.
-  const [varianteId, setVarianteId] = useState<string>(
-    disponibili[0]?.id ?? "",
-  );
   const [quantita, setQuantita] = useState<number>(1);
   const [errore, setErrore] = useState<string | null>(null);
   const [inCorso, startTransition] = useTransition();
 
-  const varianteScelta = varianti.find((v) => v.id === varianteId) ?? null;
-  const stockMax = varianteScelta?.stock ?? 0;
+  const stockMax = variante?.stock ?? 0;
   const stockBasso = stockMax > 0 && stockMax <= 3;
-  const puoAggiungere = !!varianteScelta && stockMax > 0 && quantita >= 1;
+  const puoAggiungere = !!variante && stockMax > 0 && quantita >= 1;
 
   function handleAggiungi() {
-    if (!varianteScelta) {
-      setErrore("Seleziona una taglia.");
+    if (!variante) {
+      setErrore("Seleziona colore e taglia.");
       return;
     }
     setErrore(null);
-
     const qta = Math.min(Math.max(1, quantita), stockMax);
-
     startTransition(async () => {
-      await aggiungi({ prodotto, variante: varianteScelta, quantita: qta });
+      await aggiungi({ prodotto, variante, quantita: qta });
     });
   }
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Selettore taglia */}
-      <fieldset>
-        <legend className="mb-3 font-display text-sm font-bold uppercase tracking-wide text-muted">
-          Taglia
-        </legend>
-        <div className="flex flex-wrap gap-2.5">
-          {varianti.map((v) => {
-            const esaurita = v.stock <= 0;
-            const selezionata = v.id === varianteId;
-            return (
-              <button
-                key={v.id}
-                type="button"
-                disabled={esaurita}
-                aria-pressed={selezionata}
-                onClick={() => {
-                  setVarianteId(v.id);
-                  setQuantita(1);
-                  setErrore(null);
-                }}
-                className={[
-                  "h-[50px] min-w-[50px] rounded-xl px-3 font-display font-bold transition-all",
-                  esaurita
-                    ? "cursor-not-allowed text-muted line-through ring-2 ring-surface-2 [background:repeating-linear-gradient(45deg,#fff,#fff_6px,#f1f5f8_6px,#f1f5f8_12px)]"
-                    : selezionata
-                      ? "bg-sea text-white shadow-sea"
-                      : "bg-white text-foreground ring-2 ring-surface-2 hover:-translate-y-0.5 hover:ring-lagoon",
-                ].join(" ")}
-                title={esaurita ? "Esaurita" : etichettaVariante(v)}
-              >
-                {v.taglia ?? etichettaVariante(v)}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
-
       {/* Selettore quantita */}
       <div>
         <label
           htmlFor="quantita"
           className="mb-3 block font-display text-sm font-bold uppercase tracking-wide text-muted"
         >
-          Quantita
+          Quantità
         </label>
         <div className="inline-flex items-center gap-1 rounded-full bg-white p-1.5 ring-2 ring-surface-2">
           <button
@@ -139,7 +84,7 @@ export default function AddToCart({ prodotto, varianti }: AddToCartProps) {
             +
           </button>
         </div>
-        {varianteScelta && (
+        {variante && (
           <p
             className={`mt-2 text-xs ${stockBasso ? "font-semibold text-coral" : "text-muted"}`}
           >
@@ -172,7 +117,6 @@ export default function AddToCart({ prodotto, varianti }: AddToCartProps) {
         {inCorso ? "Aggiunta in corso..." : "Aggiungi al carrello"}
       </button>
 
-      {/* Errore di validazione (es. taglia non scelta) */}
       {errore && (
         <p role="alert" className="text-sm font-semibold text-coral">
           {errore}

@@ -1,4 +1,4 @@
-// Politica di spedizione "by Frody".
+// Politica di spedizione "Borracci Anna".
 // Soglia per la spedizione gratuita: UNICO punto di verita, modificabile qui
 // (o via env NEXT_PUBLIC_FREE_SHIPPING_CENTS, in centesimi). Default 89,00 EUR.
 // Usato dalla progress bar nel carrello e nel mini-cart per spingere l'AOV.

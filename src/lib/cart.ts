@@ -38,6 +38,11 @@ interface RigaGrezza {
   variante: Variante | Variante[] | null;
 }
 
+/** Flag prodotto embeddato per decidere se applicare il magazzino. */
+interface ProdottoFlag {
+  disponibilita_su_richiesta: boolean;
+}
+
 /** Normalizza una relazione che puo arrivare come oggetto o array. */
 function primo<T>(rel: T | T[] | null): T | null {
   if (Array.isArray(rel)) {
@@ -221,17 +226,23 @@ export async function aggiungiAlCarrello(
       return esitoVuoto(false, "errore");
     }
 
-    // Risolve prodotto_id e stock attuale della variante.
+    // Risolve prodotto_id, stock e modalita "su richiesta" della variante.
     const { data: variante, error: errVar } = await supabase
       .from("varianti")
-      .select("id, prodotto_id, stock")
+      .select("id, prodotto_id, stock, prodotti (disponibilita_su_richiesta)")
       .eq("id", varianteId)
       .single();
 
     if (errVar || !variante) {
       return esitoCorrente(false, "errore");
     }
-    if (variante.stock <= 0) {
+    // Su richiesta: magazzino non in tempo reale -> niente blocco/cap di stock.
+    const suRichiesta = !!primo(
+      (variante as unknown as {
+        prodotti: ProdottoFlag | ProdottoFlag[] | null;
+      }).prodotti,
+    )?.disponibilita_su_richiesta;
+    if (!suRichiesta && variante.stock <= 0) {
       return esitoCorrente(false, "esaurito");
     }
 
@@ -245,9 +256,11 @@ export async function aggiungiAlCarrello(
 
     const giaInCarrello = esistente?.quantita ?? 0;
     const desiderata = giaInCarrello + quantita;
-    // Cap allo stock disponibile (anti-oversell).
-    const finale = Math.min(desiderata, variante.stock);
-    const cappata = finale < desiderata;
+    // Cap allo stock disponibile (anti-oversell), saltato se su richiesta.
+    const finale = suRichiesta
+      ? desiderata
+      : Math.min(desiderata, variante.stock);
+    const cappata = !suRichiesta && finale < desiderata;
 
     if (finale <= giaInCarrello && esistente) {
       // Niente da aggiungere (gia al massimo dello stock): segnala l'avviso.
@@ -308,22 +321,33 @@ export async function aggiornaQuantita(
       return esitoVuoto(false, "errore");
     }
 
-    // Stock disponibile della variante della riga (per il cap).
+    // Stock + modalita "su richiesta" della variante della riga (per il cap).
     const { data: riga } = await supabase
       .from("carrello_righe")
-      .select("id, variante:varianti (stock)")
+      .select(
+        "id, variante:varianti (stock, prodotti (disponibilita_su_richiesta))",
+      )
       .eq("id", rigaId)
       .eq("carrello_id", cartId)
       .maybeSingle();
 
     const variante = riga
-      ? primo((riga as unknown as { variante: { stock: number } | { stock: number }[] | null }).variante)
+      ? primo(
+          (riga as unknown as {
+            variante:
+              | { stock: number; prodotti: ProdottoFlag | ProdottoFlag[] | null }
+              | { stock: number; prodotti: ProdottoFlag | ProdottoFlag[] | null }[]
+              | null;
+          }).variante,
+        )
       : null;
     const stock = variante?.stock;
+    const suRichiesta = !!primo(variante?.prodotti ?? null)
+      ?.disponibilita_su_richiesta;
 
     let finale = quantita;
     let cappata = false;
-    if (typeof stock === "number" && quantita > stock) {
+    if (!suRichiesta && typeof stock === "number" && quantita > stock) {
       finale = Math.max(1, stock);
       cappata = true;
     }

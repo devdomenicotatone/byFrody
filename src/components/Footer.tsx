@@ -34,9 +34,9 @@ export default function Footer() {
         <div className="grid gap-8 md:grid-cols-[1.4fr_1fr_1fr]">
           {/* Brand + social */}
           <div>
-            <span className="wordmark text-2xl text-white [&_.wm-by]:text-lagoon">
-              <span className="wm-by">by</span>
-              <span className="wm-frody">Frody</span>
+            <span className="wordmark text-2xl text-white [&_.wm-lead]:text-lagoon">
+              <span className="wm-lead">Borracci</span>
+              <span className="wm-accent">Anna</span>
             </span>
             <p className="mt-3 max-w-[34ch] text-[#9fb6c6]">
               Abbigliamento fresco e leggero, scelto uno a uno sul lungomare di
@@ -45,7 +45,7 @@ export default function Footer() {
             <div className="mt-4 flex gap-3">
               <a
                 href="https://instagram.com"
-                aria-label="Instagram di by Frody"
+                aria-label="Instagram di Borracci Anna"
                 className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition duration-200 hover:-translate-y-0.5 hover:bg-coral"
               >
                 <svg
@@ -65,7 +65,7 @@ export default function Footer() {
               </a>
               <a
                 href="https://facebook.com"
-                aria-label="Facebook di by Frody"
+                aria-label="Facebook di Borracci Anna"
                 className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition duration-200 hover:-translate-y-0.5 hover:bg-coral"
               >
                 <svg
@@ -172,10 +172,8 @@ export default function Footer() {
 
         <div className="mt-8 border-t border-white/10 pt-5 text-sm text-[#90a6b8]">
           <p>
-            {NEGOZIO.ragioneSociale} — {NEGOZIO.indirizzoCompleto}
-          </p>
-          <p className="mt-1">
-            P.IVA {NEGOZIO.partitaIva} · REA {NEGOZIO.rea} · PEC{" "}
+            {NEGOZIO.ragioneSociale} · P.IVA {NEGOZIO.partitaIva} · REA{" "}
+            {NEGOZIO.rea} · PEC{" "}
             <a
               href={`mailto:${NEGOZIO.pec}`}
               className="transition-colors hover:text-white"
@@ -183,7 +181,7 @@ export default function Footer() {
               {NEGOZIO.pec}
             </a>
           </p>
-          <p className="mt-2">© 2026 by Frody</p>
+          <p className="mt-2">© 2026 Borracci Anna</p>
         </div>
       </div>
     </footer>

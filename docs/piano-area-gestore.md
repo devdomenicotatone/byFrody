@@ -1,4 +1,4 @@
-# Piano di Implementazione — Area Gestore byFrody (PIANO FINALE)
+# Piano di Implementazione — Area Gestore Borracci Anna (PIANO FINALE)
 
 > Tech-lead spec definitiva, verificata contro **Next 16.2.9 reale** (`node_modules/next/dist/docs/`), **schema RLS esistente** (`supabase/schema.sql`) e i **componenti reali** del progetto. Dove la verifica contraddiceva un'assunzione comune, **vince la verifica**. Le correzioni dei tre revisori (Next16-API, Sicurezza-RLS, Completezza/UX) sono integrate; priorità assoluta a **API Next 16** e **sicurezza RLS/Storage**.
 
@@ -40,7 +40,7 @@ Questa scelta **non richiede di spostare le pagine vetrina** (restano sotto `src
 ## 2) Albero file da creare/modificare
 
 ```
-byfrody/
+borracci-anna/
 ├── next.config.ts                                    [MODIFICA] images.remotePatterns + qualities
 ├── src/
 │   ├── app/
@@ -114,7 +114,7 @@ File: **`supabase/migrations/20260622210000_area_gestore.sql`** (timestamp coere
 
 ```sql
 -- ============================================================================
--- by Frody - Area Gestore (auth + RLS scrittura catalogo + storage foto)
+-- Borracci Anna - Area Gestore (auth + RLS scrittura catalogo + storage foto)
 -- Migration idempotente. NON tocca le policy pubbliche esistenti.
 -- ============================================================================
 
@@ -605,7 +605,7 @@ Le miniature admin usano `<Image width height>` (host noto). La `ProductCard` de
 **Step manuali (prima/intorno al codice):**
 - **M1.** Eseguire la migration `20260622210000_area_gestore.sql` sul cloud (CLI `supabase db push` o SQL Editor). Verificare bucket `prodotti` e `select * from public.profili`.
 - **M2.** **Signup pubbliche OFF** (Dashboard → Authentication → Providers → Email → "Enable Sign-ups" = OFF). *Difesa in profondità:* con il ruolo letto da `raw_app_meta_data`, l'auto-escalation è già bloccata a livello DB, ma OFF resta consigliato.
-- **M3.** **Creare account gestore via Admin API/dashboard** impostando il ruolo in **`app_metadata`** (NON `user_metadata`): Auth → Users → Add user → email+password, **Auto Confirm**, e impostare `app_metadata = {"ruolo":"gestore","nome":"Frody"}` (via Admin API / SQL `auth.users.raw_app_meta_data`). Il trigger crea il profilo. Verificare riga in `profili`.
+- **M3.** **Creare account gestore via Admin API/dashboard** impostando il ruolo in **`app_metadata`** (NON `user_metadata`): Auth → Users → Add user → email+password, **Auto Confirm**, e impostare `app_metadata = {"ruolo":"gestore","nome":"Borracci Anna"}` (via Admin API / SQL `auth.users.raw_app_meta_data`). Il trigger crea il profilo. Verificare riga in `profili`.
 - **M4.** Env: confermare `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`. **Nessuna nuova env.**
 - **M5. (bootstrap)** Documentare nel README il primo avvio: se nessun gestore esiste, `/gestore/login` mostra solo l'errore credenziali + testo "Contatta l'amministratore"; opzionale uno **script seed** una-tantum che crea il primo gestore con `app_metadata` corretto.
 

@@ -44,18 +44,36 @@ function IconaPiu({ className }: { className?: string }) {
   );
 }
 
+function IconaOrdini({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+      <path d="M3 6h18M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  );
+}
+
 const Wordmark = (
   <span className="wordmark text-xl">
-    <span className="wm-by">by</span>
-    <span className="wm-frody">Frody</span>
+    <span className="wm-lead">Borracci</span>
+    <span className="wm-accent">Anna</span>
     <span className="ml-1 text-sm font-medium text-muted">· gestore</span>
   </span>
 );
 
 const WordmarkBianco = (
   <span className="wordmark text-xl text-white">
-    <span className="wm-by !text-lagoon">by</span>
-    <span className="wm-frody">Frody</span>
+    <span className="wm-lead !text-lagoon">Borracci</span>
+    <span className="wm-accent">Anna</span>
     <span className="ml-1 text-sm font-medium text-white/70">· gestore</span>
   </span>
 );
@@ -70,6 +88,7 @@ export default function AdminNav({
   const pathname = usePathname();
   const suNuovo = pathname.startsWith("/gestore/prodotti/nuovo");
   const suProdotti = pathname.startsWith("/gestore/prodotti") && !suNuovo;
+  const suOrdini = pathname.startsWith("/gestore/ordini");
   // Sulle pagine di form (nuovo / modifica) la save-bar prende il fondo:
   // nascondiamo la bottom-nav mobile per non sovrapporle.
   const suFormProdotto = /^\/gestore\/prodotti\/.+/.test(pathname);
@@ -78,7 +97,7 @@ export default function AdminNav({
     <>
       {/* HEADER mobile */}
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-white/85 px-4 backdrop-blur md:hidden">
-        <Link href="/gestore/prodotti" aria-label="Area gestore by Frody">
+        <Link href="/gestore/prodotti" aria-label="Area gestore Borracci Anna">
           {Wordmark}
         </Link>
         <form action={logoutGestore}>
@@ -97,7 +116,7 @@ export default function AdminNav({
         <div className="bg-ink-gradient px-4 py-4">
           <Link
             href="/gestore/prodotti"
-            aria-label="Area gestore by Frody"
+            aria-label="Area gestore Borracci Anna"
             className="flex items-center gap-2"
           >
             <span
@@ -111,6 +130,10 @@ export default function AdminNav({
           <Link href="/gestore/prodotti" className={voceSidebar(suProdotti)}>
             <IconaProdotti className="h-5 w-5" />
             Prodotti
+          </Link>
+          <Link href="/gestore/ordini" className={voceSidebar(suOrdini)}>
+            <IconaOrdini className="h-5 w-5" />
+            Ordini
           </Link>
           <Link href="/gestore/prodotti/nuovo" className={voceSidebar(suNuovo)}>
             <IconaPiu className="h-5 w-5" />
@@ -145,10 +168,14 @@ export default function AdminNav({
 
       {/* BOTTOM-NAV mobile (nascosta sulle pagine di form) */}
       {!suFormProdotto && (
-        <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-2 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-3 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
           <Link href="/gestore/prodotti" className={voceBottom(suProdotti)}>
             <IconaProdotti className="h-5 w-5" />
             <span>Prodotti</span>
+          </Link>
+          <Link href="/gestore/ordini" className={voceBottom(suOrdini)}>
+            <IconaOrdini className="h-5 w-5" />
+            <span>Ordini</span>
           </Link>
           <Link href="/gestore/prodotti/nuovo" className={voceBottom(suNuovo)}>
             <IconaPiu className="h-5 w-5" />

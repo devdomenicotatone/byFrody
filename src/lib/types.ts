@@ -1,5 +1,17 @@
-// Tipi condivisi del dominio e-commerce "by Frody".
+// Tipi condivisi del dominio e-commerce "Borracci Anna".
 // Valuta in EUR, prezzi sempre in centesimi (interi) per evitare errori float.
+
+/** Una categoria di catalogo (lista gestibile dal pannello). */
+export interface Categoria {
+  id: string;
+  /** Slug url-friendly, univoco (es. "polo"). */
+  slug: string;
+  nome: string;
+  /** Categoria padre (macro). null = categoria di primo livello (es. Uomo/Donna). */
+  parent_id?: string | null;
+  /** Ordinamento in elenco/menu (ascendente). */
+  ordine: number;
+}
 
 /** Un prodotto a catalogo. */
 export interface Prodotto {
@@ -14,6 +26,29 @@ export interface Prodotto {
   valuta: string;
   immagine_url: string | null;
   attivo: boolean;
+  /** Categoria assegnata (null = senza categoria). */
+  categoria_id?: string | null;
+  /**
+   * Magazzino non in tempo reale: il cliente sceglie colore+taglia e contatta
+   * il negozio ("Scrivici per la disponibilita") invece di comprare subito.
+   * Default true (vedi migration 20260623160000).
+   */
+  disponibilita_su_richiesta?: boolean;
+}
+
+/**
+ * Una foto della galleria prodotto. `variante_id` opzionale: se valorizzato la
+ * foto rappresenta quel colore. La copertina resta `Prodotto.immagine_url`.
+ */
+export interface ProdottoFoto {
+  id: string;
+  prodotto_id: string;
+  variante_id: string | null;
+  /** Colore rappresentato dalla foto (testo, dalla palette). null = generica. */
+  colore: string | null;
+  url: string;
+  /** Ordinamento in galleria (ascendente). */
+  ordine: number;
 }
 
 /** Una variante acquistabile di un prodotto (taglia/colore + scorte). */
@@ -59,8 +94,13 @@ export interface EsitoCarrello {
   motivo?: "non_configurato" | "esaurito" | "stock_insufficiente" | "errore";
 }
 
-/** Stato di avanzamento di un ordine. */
-export type StatoOrdine = "in_attesa" | "pagato" | "annullato";
+/**
+ * Stato di avanzamento di un ordine (flusso a pagamento differito):
+ * in_attesa  = richiesta inviata, da confermare dal gestore;
+ * confermato = disponibilita confermata, in attesa di pagamento;
+ * pagato     = pagato; annullato = rifiutato/annullato.
+ */
+export type StatoOrdine = "in_attesa" | "confermato" | "pagato" | "annullato";
 
 /** Un ordine cliente. */
 export interface Ordine {
@@ -69,9 +109,31 @@ export interface Ordine {
   /** Totale in centesimi di euro. */
   totale_cents: number;
   email: string | null;
+  /** Dati cliente della richiesta. */
+  nome: string | null;
+  telefono: string | null;
+  note: string | null;
+  /** Token segreto per la pagina pubblica /ordine/[token]. */
+  token: string | null;
+  /** Timestamp ISO 8601 della conferma disponibilita (null se non confermato). */
+  confermato_il: string | null;
   stripe_session_id: string | null;
   /** Timestamp ISO 8601 di creazione. */
   creato_il: string;
+}
+
+/** Una riga d'ordine (snapshot del prodotto al momento della richiesta). */
+export interface OrdineRiga {
+  id: string;
+  ordine_id: string;
+  prodotto_id: string | null;
+  variante_id: string | null;
+  nome_prodotto: string;
+  sku: string | null;
+  prezzo_cents: number;
+  quantita: number;
+  taglia?: string | null;
+  colore?: string | null;
 }
 
 /** Un utente abilitato all'area gestore (riga in public.profili). */

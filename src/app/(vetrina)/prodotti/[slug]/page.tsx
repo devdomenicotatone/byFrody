@@ -1,25 +1,37 @@
-// Pagina Prodotto (PDP) - by Frody.
-// Server Component dinamico: carica il prodotto e le sue varianti da Supabase
-// per slug. Se le env Supabase non sono configurate degrada con grazia a un
-// prodotto d'esempio, cosi il progetto builda anche senza database.
+// Pagina Prodotto (PDP) - Borracci Anna.
+// Server Component dinamico: carica il prodotto, le sue varianti e la galleria
+// foto da Supabase per slug. Se le env Supabase non sono configurate degrada
+// con grazia a un prodotto d'esempio, cosi il progetto builda anche senza DB.
 
-import Image from "next/image";
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import AddToCart from "@/components/AddToCart";
-import { formatPrezzo } from "@/lib/format";
+import ProdottoDettaglio from "@/components/prodotto/ProdottoDettaglio";
 import { createServerSupabase } from "@/lib/supabase/server";
-import type { ProdottoConVarianti, Variante } from "@/lib/types";
+import { ordineTaglia } from "@/lib/catalogo";
+import type {
+  Categoria,
+  ProdottoConVarianti,
+  ProdottoFoto,
+  Variante,
+} from "@/lib/types";
 
 // Le pagine che leggono dal DB non vanno prerenderizzate staticamente.
 export const dynamic = "force-dynamic";
+
+type ProdottoPdp = ProdottoConVarianti & {
+  foto: ProdottoFoto[];
+  /** Catena categorie dal livello macro (es. Uomo) alla foglia (es. Polo),
+   *  usata dal breadcrumb. Vuota se il prodotto non ha categoria. */
+  percorso: Categoria[];
+};
 
 /**
  * Prodotto d'esempio usato quando Supabase non e configurato (build/anteprima
  * senza env). Coerente con i dati di esempio dello schema.
  */
-function prodottoEsempio(slug: string): ProdottoConVarianti {
+function prodottoEsempio(slug: string): ProdottoPdp {
   const prodottoId = "esempio-prodotto";
   const taglie: Array<{ taglia: string; stock: number }> = [
     { taglia: "S", stock: 10 },
@@ -47,51 +59,69 @@ function prodottoEsempio(slug: string): ProdottoConVarianti {
     valuta: "EUR",
     immagine_url: null,
     attivo: true,
+    disponibilita_su_richiesta: true,
     varianti,
+    foto: [],
+    percorso: [],
   };
 }
 
 /**
- * Carica un prodotto attivo + varianti per slug.
- * Ritorna:
- *  - il prodotto, se trovato;
- *  - `null` se Supabase e configurato ma lo slug non esiste (=> notFound);
- *  - un prodotto d'esempio se Supabase NON e configurato (degrado morbido).
+ * Carica un prodotto attivo + varianti + galleria foto per slug.
+ * Ritorna il prodotto, `null` se Supabase e configurato ma lo slug non esiste
+ * (=> notFound), o un prodotto d'esempio se Supabase NON e configurato.
  */
-async function caricaProdotto(
-  slug: string,
-): Promise<ProdottoConVarianti | null> {
+async function caricaProdotto(slug: string): Promise<ProdottoPdp | null> {
   try {
     const supabase = await createServerSupabase();
+    if (!supabase) return prodottoEsempio(slug);
 
-    // Env mancanti: degrada all'esempio (niente errori in build).
-    if (!supabase) {
-      return prodottoEsempio(slug);
+    // Prodotto e lista categorie in parallelo: le categorie non dipendono dal
+    // prodotto, cosi la catena del breadcrumb non aggiunge un round-trip.
+    const [prodottoRes, categorieRes] = await Promise.all([
+      supabase
+        .from("prodotti")
+        .select(
+          "id, slug, nome, descrizione, prezzo_cents, valuta, immagine_url, attivo, disponibilita_su_richiesta, categoria_id, varianti(id, prodotto_id, taglia, colore, sku, stock), prodotto_foto(id, prodotto_id, variante_id, colore, url, ordine)",
+        )
+        .eq("slug", slug)
+        .eq("attivo", true)
+        .maybeSingle(),
+      supabase.from("categorie").select("id, slug, nome, parent_id, ordine"),
+    ]);
+
+    const { data, error } = prodottoRes;
+    if (error || !data) return null;
+
+    // Ordina le varianti per taglia (scala S→6XL) e poi per colore.
+    const varianti = [...((data.varianti as Variante[]) ?? [])].sort(
+      (a, b) =>
+        ordineTaglia(a.taglia) - ordineTaglia(b.taglia) ||
+        (a.colore ?? "").localeCompare(b.colore ?? ""),
+    );
+
+    const foto = [...((data.prodotto_foto as ProdottoFoto[]) ?? [])].sort(
+      (a, b) => a.ordine - b.ordine,
+    );
+
+    // Risale la gerarchia dalla foglia (categoria del prodotto) alla macro,
+    // partendo dalla lista completa (tabella minuscola). `unshift` mette la
+    // radice per prima -> [Uomo, Polo]. Guardia anti-ciclo per sicurezza.
+    const catPerId = new Map(
+      ((categorieRes.data as Categoria[] | null) ?? []).map((c) => [c.id, c]),
+    );
+    const percorso: Categoria[] = [];
+    const visti = new Set<string>();
+    let corrente = data.categoria_id
+      ? catPerId.get(data.categoria_id)
+      : undefined;
+    while (corrente && !visti.has(corrente.id)) {
+      visti.add(corrente.id);
+      percorso.unshift(corrente);
+      corrente = corrente.parent_id
+        ? catPerId.get(corrente.parent_id)
+        : undefined;
     }
-
-    const { data, error } = await supabase
-      .from("prodotti")
-      .select(
-        "id, slug, nome, descrizione, prezzo_cents, valuta, immagine_url, attivo, varianti(id, prodotto_id, taglia, colore, sku, stock)",
-      )
-      .eq("slug", slug)
-      .eq("attivo", true)
-      .maybeSingle();
-
-    if (error || !data) {
-      return null;
-    }
-
-    // Ordina le varianti per taglia in modo prevedibile (S, M, L, XL, ...).
-    const ordineTaglie = ["XS", "S", "M", "L", "XL", "XXL"];
-    const varianti = [...((data.varianti as Variante[]) ?? [])].sort((a, b) => {
-      const ia = ordineTaglie.indexOf(a.taglia ?? "");
-      const ib = ordineTaglie.indexOf(b.taglia ?? "");
-      if (ia === -1 && ib === -1) return (a.taglia ?? "").localeCompare(b.taglia ?? "");
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
-      return ia - ib;
-    });
 
     return {
       id: data.id,
@@ -102,10 +132,12 @@ async function caricaProdotto(
       valuta: data.valuta,
       immagine_url: data.immagine_url,
       attivo: data.attivo,
+      disponibilita_su_richiesta: data.disponibilita_su_richiesta,
       varianti,
+      foto,
+      percorso,
     };
   } catch {
-    // Errore imprevisto a runtime: meglio una pagina d'esempio che un crash.
     return prodottoEsempio(slug);
   }
 }
@@ -123,106 +155,47 @@ export default async function PaginaProdotto({ params }: PdpProps) {
     notFound();
   }
 
-  const disponibili = prodotto.varianti.filter((v) => v.stock > 0);
-  const esaurito = prodotto.varianti.length > 0 && disponibili.length === 0;
-  const senzaVarianti = prodotto.varianti.length === 0;
+  const { foto, percorso, ...prodottoBase } = prodotto;
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 lg:px-8">
       <nav
-        className="mb-8 flex items-center gap-2 text-sm text-muted"
+        className="mb-8 flex flex-wrap items-center gap-2 text-sm text-muted"
         aria-label="Percorso di navigazione"
       >
-        <Link
-          href="/"
-          className="font-medium text-sea transition-colors hover:text-lagoon"
-        >
-          by Frody
-        </Link>
-        <span aria-hidden="true" className="text-line">
-          /
-        </span>
+        {percorso.length > 0 ? (
+          // Catena categorie (es. Uomo / Polo). Solo testo: non esistono ancora
+          // pagine filtrate per categoria a cui collegarsi.
+          percorso.map((c) => (
+            <Fragment key={c.id}>
+              <span className="font-medium">{c.nome}</span>
+              <span aria-hidden="true" className="text-line">
+                /
+              </span>
+            </Fragment>
+          ))
+        ) : (
+          // Fallback senza categoria: link alla home come prima.
+          <>
+            <Link
+              href="/"
+              className="font-medium text-sea transition-colors hover:text-lagoon"
+            >
+              Borracci Anna
+            </Link>
+            <span aria-hidden="true" className="text-line">
+              /
+            </span>
+          </>
+        )}
         <span className="font-medium text-foreground">{prodotto.nome}</span>
       </nav>
 
-      <div className="grid grid-cols-1 items-start gap-10 md:grid-cols-2">
-        {/* Immagine prodotto */}
-        <div className="relative aspect-square w-full overflow-hidden rounded-3xl shadow-sea">
-          {prodotto.immagine_url ? (
-            <Image
-              src={prodotto.immagine_url}
-              alt={prodotto.nome}
-              fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-cover"
-              priority
-            />
-          ) : (
-            <div className="tile-cyan dots-overlay flex h-full w-full items-center justify-center">
-              <svg
-                className="w-2/5 text-white drop-shadow-[0_6px_12px_rgba(0,40,70,0.25)]"
-                viewBox="0 0 100 100"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M32 18 L18 28 L24 40 L31 35 L31 84 L69 84 L69 35 L76 40 L82 28 L68 18 C64 24 56 26 50 26 C44 26 36 24 32 18 Z" />
-              </svg>
-            </div>
-          )}
-        </div>
-
-        {/* Dettagli e acquisto */}
-        <div className="flex flex-col">
-          <span className="mb-2 inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-lagoon">
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
-              <circle cx="12" cy="12" r="3.4" />
-            </svg>
-            Dettaglio prodotto
-          </span>
-
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-            {prodotto.nome}
-          </h1>
-
-          <p className="mt-3 font-display text-3xl font-extrabold text-coral">
-            {formatPrezzo(prodotto.prezzo_cents, prodotto.valuta)}
-          </p>
-
-          {prodotto.descrizione && (
-            <p className="mt-6 max-w-prose leading-relaxed text-muted">
-              {prodotto.descrizione}
-            </p>
-          )}
-
-          <div className="mt-8">
-            {senzaVarianti ? (
-              <p className="rounded-2xl bg-surface px-4 py-3 text-sm text-muted ring-1 ring-line">
-                Nessuna variante disponibile per questo prodotto.
-              </p>
-            ) : esaurito ? (
-              <p className="rounded-2xl bg-surface px-4 py-3 text-sm font-semibold text-coral ring-1 ring-coral/30">
-                Prodotto esaurito.
-              </p>
-            ) : (
-              <AddToCart prodotto={prodotto} varianti={prodotto.varianti} />
-            )}
-          </div>
-
-          <p className="mt-8 font-mono text-xs text-muted">
-            SKU prodotto: {prodotto.slug}
-          </p>
-        </div>
-      </div>
+      <ProdottoDettaglio
+        prodotto={prodottoBase}
+        foto={foto}
+        suRichiesta={prodottoBase.disponibilita_su_richiesta ?? true}
+      />
     </main>
   );
 }
