@@ -1,15 +1,10 @@
 import { requireGestore } from "@/lib/gestore/auth";
 import FormProdotto from "@/components/gestore/FormProdotto";
-import type { Categoria } from "@/lib/types";
+import { caricaCategorie } from "@/lib/categorie";
 
 export default async function NuovoProdottoPage() {
   const { supabase } = await requireGestore();
-
-  const { data: catData } = await supabase
-    .from("categorie")
-    .select("id, slug, nome, parent_id, ordine")
-    .order("ordine", { ascending: true });
-  const categorie = (catData as Categoria[] | null) ?? [];
+  const categorie = await caricaCategorie(supabase);
 
   return (
     <div>

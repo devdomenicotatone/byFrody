@@ -13,12 +13,3 @@ export function slugify(testo: string): string {
     .replace(/[^a-z0-9]+/g, "-") // non-alfanumerico => "-"
     .replace(/^-+|-+$/g, ""); // niente "-" iniziali/finali
 }
-
-/**
- * Restituisce lo slug con un suffisso numerico per disambiguarlo.
- * slugConSuffisso("maglia", 1) => "maglia"; (..., 2) => "maglia-2".
- * Utile lato client quando lo slug base risulta gia in uso.
- */
-export function slugConSuffisso(slug: string, n: number): string {
-  return n <= 1 ? slug : `${slug}-${n}`;
-}

@@ -4,14 +4,16 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { Database } from "@/lib/supabase/database.types";
+
 /**
  * Crea un client Supabase per il browser.
  * Le env pubbliche sono sostituite a compile time; se mancano i metodi
  * falliranno a runtime, ma il modulo non lancia in fase di import/build.
  */
-export function createBrowserSupabase(): SupabaseClient {
+export function createBrowserSupabase(): SupabaseClient<Database> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-  return createBrowserClient(url, anonKey);
+  return createBrowserClient<Database>(url, anonKey);
 }

@@ -101,7 +101,7 @@ const ALIAS_HEX: Record<string, string> = {
 };
 
 /** Campione neutro per i colori fuori palette (es. dati legacy a testo libero). */
-export const HEX_FALLBACK = "#d4d4d8";
+const HEX_FALLBACK = "#d4d4d8";
 
 /**
  * Esadecimale di un colore per nome. Prova: match esatto in palette/alias,

@@ -3,7 +3,8 @@
 // foto da Supabase per slug. Se le env Supabase non sono configurate degrada
 // con grazia a un prodotto d'esempio, cosi il progetto builda anche senza DB.
 
-import { Fragment } from "react";
+import { Fragment, cache } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -71,7 +72,9 @@ function prodottoEsempio(slug: string): ProdottoPdp {
  * Ritorna il prodotto, `null` se Supabase e configurato ma lo slug non esiste
  * (=> notFound), o un prodotto d'esempio se Supabase NON e configurato.
  */
-async function caricaProdotto(slug: string): Promise<ProdottoPdp | null> {
+const caricaProdotto = cache(async (
+  slug: string,
+): Promise<ProdottoPdp | null> => {
   try {
     const supabase = await createServerSupabase();
     if (!supabase) return prodottoEsempio(slug);
@@ -140,11 +143,41 @@ async function caricaProdotto(slug: string): Promise<ProdottoPdp | null> {
   } catch {
     return prodottoEsempio(slug);
   }
-}
+});
 
 interface PdpProps {
   // Next 16: params e una Promise.
   params: Promise<{ slug: string }>;
+}
+
+/**
+ * Metadati per-prodotto (title/description/OpenGraph). Condivide il fetch con la
+ * pagina via cache(): caricaProdotto e memoizzato per-richiesta, niente doppio
+ * round-trip al DB.
+ */
+export async function generateMetadata({
+  params,
+}: PdpProps): Promise<Metadata> {
+  const { slug } = await params;
+  const prodotto = await caricaProdotto(slug);
+  if (!prodotto) {
+    return { title: "Prodotto non trovato" };
+  }
+
+  const descrizione =
+    (prodotto.descrizione ?? "").replace(/\s+/g, " ").trim().slice(0, 160) ||
+    `${prodotto.nome} — Borracci Anna, moda fresca sul lungomare di Rimini.`;
+
+  return {
+    title: prodotto.nome, // -> "<nome> · Borracci Anna" via template del root
+    description: descrizione,
+    openGraph: {
+      title: `${prodotto.nome} · Borracci Anna`,
+      description: descrizione,
+      type: "website",
+      images: prodotto.immagine_url ? [{ url: prodotto.immagine_url }] : [],
+    },
+  };
 }
 
 export default async function PaginaProdotto({ params }: PdpProps) {
@@ -192,6 +225,9 @@ export default async function PaginaProdotto({ params }: PdpProps) {
       </nav>
 
       <ProdottoDettaglio
+        // Rimonta al cambio prodotto: azzera la selezione colore/taglia/foto
+        // (altrimenti la navigazione client-side tra PDP mantiene lo stato di A).
+        key={prodottoBase.slug}
         prodotto={prodottoBase}
         foto={foto}
         suRichiesta={prodottoBase.disponibilita_su_richiesta ?? true}

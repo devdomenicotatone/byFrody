@@ -11,7 +11,7 @@ import type {
   VarianteSalvata,
   FotoGalleriaRow,
 } from "@/lib/gestore/actions";
-import type { Categoria } from "@/lib/types";
+import { caricaCategorie } from "@/lib/categorie";
 
 // Modifica prodotto. In Next 16 `params` e una Promise: va atteso.
 export default async function ModificaProdottoPage({
@@ -33,11 +33,7 @@ export default async function ModificaProdottoPage({
   if (!data) notFound();
   const prodotto = data as ProdottoForm & { immagine_url: string | null };
 
-  const { data: catData } = await supabase
-    .from("categorie")
-    .select("id, slug, nome, parent_id, ordine")
-    .order("ordine", { ascending: true });
-  const categorie = (catData as Categoria[] | null) ?? [];
+  const categorie = await caricaCategorie(supabase);
 
   const { data: varData } = await supabase
     .from("varianti")
@@ -52,7 +48,7 @@ export default async function ModificaProdottoPage({
 
   const { data: fotoData } = await supabase
     .from("prodotto_foto")
-    .select("id, prodotto_id, variante_id, url, ordine")
+    .select("id, prodotto_id, variante_id, colore, url, ordine")
     .eq("prodotto_id", id)
     .order("ordine", { ascending: true });
   const fotoGalleria = (fotoData as FotoGalleriaRow[] | null) ?? [];

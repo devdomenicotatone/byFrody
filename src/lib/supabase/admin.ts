@@ -5,6 +5,8 @@
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { Database } from "@/lib/supabase/database.types";
+
 // NB: questo modulo deve essere importato SOLO da codice server (route handler,
 // server action). La service role key non deve mai finire nel bundle client.
 
@@ -14,7 +16,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *
  * Lancia solo se chiamato senza le env necessarie (mai durante import/build).
  */
-export function createAdminSupabase(): SupabaseClient {
+export function createAdminSupabase(): SupabaseClient<Database> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -24,7 +26,7 @@ export function createAdminSupabase(): SupabaseClient {
     );
   }
 
-  return createClient(url, serviceRoleKey, {
+  return createClient<Database>(url, serviceRoleKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,

@@ -35,7 +35,7 @@ export default function CheckoutSuccessoPage() {
           Grazie per il tuo ordine
         </h1>
         <p className="mt-3 text-base leading-7 text-muted">
-          Il pagamento e andato a buon fine. Riceverai a breve una email di
+          Il pagamento è andato a buon fine. Riceverai a breve una email di
           conferma con il riepilogo dell&apos;ordine.
         </p>
 

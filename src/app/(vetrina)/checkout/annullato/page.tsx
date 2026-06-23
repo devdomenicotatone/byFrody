@@ -30,7 +30,7 @@ export default function CheckoutAnnullatoPage() {
           Pagamento annullato
         </h1>
         <p className="mt-3 text-base leading-7 text-muted">
-          Non e stato addebitato nulla. Il tuo carrello e ancora qui: puoi
+          Non è stato addebitato nulla. Il tuo carrello è ancora qui: puoi
           completare l&apos;acquisto quando vuoi.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">

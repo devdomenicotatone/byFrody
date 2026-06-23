@@ -298,7 +298,7 @@ export default function FormProdotto({
         {stato.errors?.generale && (
           <p
             role="alert"
-            className="rounded-2xl bg-coral/10 px-4 py-3 text-sm font-bold text-coral"
+            className="rounded-2xl bg-coral/10 px-4 py-3 text-sm font-bold text-coral-ink"
           >
             {stato.errors.generale}
           </p>
@@ -362,7 +362,7 @@ function Campo({
       </label>
       {children}
       {errore ? (
-        <p className="text-xs font-bold text-coral">{errore}</p>
+        <p className="text-xs font-bold text-coral-ink">{errore}</p>
       ) : hint ? (
         <p className="text-xs text-muted">{hint}</p>
       ) : null}

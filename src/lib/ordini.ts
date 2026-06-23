@@ -48,10 +48,12 @@ export async function inviaRichiestaAction(
   _stato: StatoRichiesta,
   formData: FormData,
 ): Promise<StatoRichiesta> {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
-  const telefono = String(formData.get("telefono") ?? "").trim();
-  const note = String(formData.get("note") ?? "").trim();
+  // Endpoint pubblico (POST): trim + cap di lunghezza per evitare DB bloat e
+  // payload abnormi nelle email.
+  const nome = String(formData.get("nome") ?? "").trim().slice(0, 200);
+  const email = String(formData.get("email") ?? "").trim().slice(0, 254);
+  const telefono = String(formData.get("telefono") ?? "").trim().slice(0, 40);
+  const note = String(formData.get("note") ?? "").trim().slice(0, 2000);
 
   const errors: NonNullable<StatoRichiesta["errors"]> = {};
   if (!nome) errors.nome = "Inserisci il tuo nome.";
@@ -69,6 +71,21 @@ export async function inviaRichiestaAction(
 
   try {
     const admin = createAdminSupabase();
+
+    // Rate limit best-effort (DB-backed, quindi condiviso tra istanze): frena
+    // flood e doppi invii. Max 3 richieste / 60s per email.
+    const daPocoIso = new Date(Date.now() - 60_000).toISOString();
+    const { count: recenti } = await admin
+      .from("ordini")
+      .select("id", { count: "exact", head: true })
+      .eq("email", email)
+      .gte("creato_il", daPocoIso);
+    if ((recenti ?? 0) >= 3) {
+      return {
+        error: "Hai inviato troppe richieste di recente. Riprova tra qualche minuto.",
+      };
+    }
+
     const { data: ordine, error } = await admin
       .from("ordini")
       .insert({

@@ -3,15 +3,21 @@
 // con admin client (gli ordini non hanno policy anon). Mostra lo stato e, se
 // confermato, il bottone "Paga ora".
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import PulsantePaga from "@/components/prodotto/PulsantePaga";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { formatPrezzo } from "@/lib/format";
-import type { StatoOrdine } from "@/lib/types";
+import { isStatoOrdine, type StatoOrdine } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+// Pagina gated da token con PII dell'ordine: mai indicizzata.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 interface RigaOrdine {
   nome_prodotto: string;
@@ -40,7 +46,9 @@ async function caricaOrdine(token: string): Promise<OrdineDettaglio | null> {
       )
       .eq("token", token)
       .maybeSingle();
-    if (error || !data) return null;
+    // Narrow runtime di `stato` (dal DB arriva come string): uno stato ignoto
+    // -> trattato come ordine non trovato, niente STATO_UI[undefined].
+    if (error || !data || !isStatoOrdine(data.stato)) return null;
     return {
       id: data.id,
       stato: data.stato,
@@ -107,7 +115,7 @@ export default async function PaginaOrdine({
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-12 sm:px-6">
-      <p className="font-display text-sm font-bold uppercase tracking-wide text-lagoon">
+      <p className="font-display text-sm font-bold uppercase tracking-wide text-sea">
         Il tuo ordine
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-3">

@@ -149,7 +149,7 @@ export default function ProdottoDettaglio({
 
       {/* Dettagli e acquisto */}
       <div className="flex flex-col">
-        <span className="mb-2 inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-lagoon">
+        <span className="mb-2 inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-sea">
           <svg
             className="h-4 w-4"
             viewBox="0 0 24 24"
@@ -296,7 +296,7 @@ export default function ProdottoDettaglio({
               Nessuna variante disponibile per questo prodotto.
             </p>
           ) : esaurito ? (
-            <p className="rounded-2xl bg-surface px-4 py-3 text-sm font-semibold text-coral ring-1 ring-coral/30">
+            <p className="rounded-2xl bg-surface px-4 py-3 text-sm font-semibold text-coral-ink ring-1 ring-coral/30">
               Prodotto esaurito.
             </p>
           ) : (

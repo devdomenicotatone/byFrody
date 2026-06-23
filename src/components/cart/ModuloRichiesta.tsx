@@ -51,7 +51,7 @@ export default function ModuloRichiesta() {
           className={inputCls}
         />
         {stato.errors?.nome && (
-          <p className="text-xs font-bold text-coral">{stato.errors.nome}</p>
+          <p className="text-xs font-bold text-coral-ink">{stato.errors.nome}</p>
         )}
       </div>
 
@@ -72,7 +72,7 @@ export default function ModuloRichiesta() {
           className={inputCls}
         />
         {stato.errors?.email && (
-          <p className="text-xs font-bold text-coral">{stato.errors.email}</p>
+          <p className="text-xs font-bold text-coral-ink">{stato.errors.email}</p>
         )}
       </div>
 
@@ -113,7 +113,7 @@ export default function ModuloRichiesta() {
       {stato.error && (
         <p
           role="alert"
-          className="rounded-2xl bg-coral/10 px-4 py-3 text-sm font-bold text-coral"
+          className="rounded-2xl bg-coral/10 px-4 py-3 text-sm font-bold text-coral-ink"
         >
           {stato.error}
         </p>

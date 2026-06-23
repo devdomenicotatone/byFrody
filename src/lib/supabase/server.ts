@@ -7,13 +7,15 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { Database } from "@/lib/supabase/database.types";
+
 /**
  * Crea un client Supabase lato server legato ai cookie della richiesta.
  * Ritorna `null` se NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY mancano.
  *
  * Next 16: cookies() e ASYNC, quindi va atteso.
  */
-export async function createServerSupabase(): Promise<SupabaseClient | null> {
+export async function createServerSupabase(): Promise<SupabaseClient<Database> | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -23,7 +25,7 @@ export async function createServerSupabase(): Promise<SupabaseClient | null> {
 
   const cookieStore = await cookies();
 
-  return createServerClient(url, anonKey, {
+  return createServerClient<Database>(url, anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

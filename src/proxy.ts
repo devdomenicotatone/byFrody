@@ -59,8 +59,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Tutte le route tranne static/asset (i doc auth raccomandano "tutte").
+  // Tutte le route tranne static/asset e /api/* (i route handler — webhook
+  // Stripe, checkout — non hanno sessione cookie da rinfrescare e non sono
+  // sotto /gestore, quindi evitiamo un getUser() inutile a ogni chiamata).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

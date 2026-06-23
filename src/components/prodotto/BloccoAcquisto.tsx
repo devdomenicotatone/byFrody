@@ -86,7 +86,7 @@ export default function BloccoAcquisto({
         </div>
         {variante && (
           <p
-            className={`mt-2 text-xs ${stockBasso ? "font-semibold text-coral" : "text-muted"}`}
+            className={`mt-2 text-xs ${stockBasso ? "font-semibold text-coral-ink" : "text-muted"}`}
           >
             {stockBasso ? `Solo ${stockMax} rimasti` : `${stockMax} disponibili`}
           </p>
@@ -118,7 +118,7 @@ export default function BloccoAcquisto({
       </button>
 
       {errore && (
-        <p role="alert" className="text-sm font-semibold text-coral">
+        <p role="alert" className="text-sm font-semibold text-coral-ink">
           {errore}
         </p>
       )}

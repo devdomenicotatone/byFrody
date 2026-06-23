@@ -38,9 +38,14 @@ export default function CartItem({
 
   const variante = etichettaVariante(riga);
   const subtotale = riga.prodotto.prezzo_cents * riga.quantita;
-  // Non superare lo stock disponibile della variante.
-  const maxQuantita = Math.max(riga.variante.stock, riga.quantita);
-  const stockBasso = riga.variante.stock > 0 && riga.variante.stock <= 3;
+  // Su richiesta: magazzino non in tempo reale -> nessun cap di stock sul "+"
+  // e nessun avviso "Solo N rimasti" (coerente con la PDP e il flusso richiesta).
+  const suRichiesta = riga.prodotto.disponibilita_su_richiesta ?? false;
+  const maxQuantita = suRichiesta
+    ? Number.POSITIVE_INFINITY
+    : Math.max(riga.variante.stock, riga.quantita);
+  const stockBasso =
+    !suRichiesta && riga.variante.stock > 0 && riga.variante.stock <= 3;
   const lato = compatto ? "h-20 w-20" : "h-24 w-24";
 
   function impostaQuantita(nuova: number) {
@@ -107,7 +112,7 @@ export default function CartItem({
               cad.
             </p>
             {stockBasso && (
-              <p className="mt-1 text-xs font-semibold text-coral">
+              <p className="mt-1 text-xs font-semibold text-coral-ink">
                 Solo {riga.variante.stock} rimasti
               </p>
             )}
@@ -187,9 +192,9 @@ export function CheckoutButton({
         clearTimeout(timeout);
 
         if (!res.ok) {
-          let messaggio = "Non e stato possibile avviare il pagamento. Riprova.";
+          let messaggio = "Non è stato possibile avviare il pagamento. Riprova.";
           if (res.status === 400) {
-            messaggio = "Il carrello e vuoto.";
+            messaggio = "Il carrello è vuoto.";
           } else if (res.status === 501) {
             messaggio = "Pagamenti non disponibili al momento. Scrivici per ordinare.";
           } else {

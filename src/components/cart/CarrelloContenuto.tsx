@@ -107,7 +107,7 @@ function StatoVuoto() {
       </div>
       <div>
         <p className="font-display text-lg font-bold text-foreground">
-          Il carrello e vuoto
+          Il carrello è vuoto
         </p>
         <p className="mt-1 text-sm text-muted">
           Non hai ancora aggiunto nessun articolo. Tuffati nella collezione!

@@ -177,7 +177,7 @@ export default async function Home() {
         className="mx-auto max-w-6xl scroll-mt-20 px-5 py-12 sm:py-16"
       >
         <div className="mb-8 sm:mb-10">
-          <span className="inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-lagoon">
+          <span className="inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-sea">
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -209,7 +209,7 @@ export default async function Home() {
               <span className="wm-accent">Anna</span>
             </p>
             <p className="mt-4 text-sm text-muted">
-              La vetrina e in aggiornamento. Torna presto.
+              La vetrina è in aggiornamento. Torna presto.
             </p>
           </div>
         ) : (

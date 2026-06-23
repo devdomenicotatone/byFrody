@@ -121,7 +121,7 @@ export async function leggiCarrello(): Promise<RigaCarrello[]> {
       .from("carrello_righe")
       .select(
         `id, quantita,
-         prodotto:prodotti (id, slug, nome, descrizione, prezzo_cents, valuta, immagine_url, attivo),
+         prodotto:prodotti (id, slug, nome, descrizione, prezzo_cents, valuta, immagine_url, attivo, disponibilita_su_richiesta),
          variante:varianti (id, prodotto_id, taglia, colore, sku, stock)`,
       )
       .eq("carrello_id", cartId)
@@ -272,17 +272,19 @@ export async function aggiungiAlCarrello(
     }
 
     if (esistente) {
-      await supabase
+      const { error: errUpd } = await supabase
         .from("carrello_righe")
         .update({ quantita: finale })
         .eq("id", esistente.id);
+      if (errUpd) return esitoCorrente(false, "errore");
     } else {
-      await supabase.from("carrello_righe").insert({
+      const { error: errIns } = await supabase.from("carrello_righe").insert({
         carrello_id: cartId,
         prodotto_id: variante.prodotto_id,
         variante_id: varianteId,
         quantita: finale,
       });
+      if (errIns) return esitoCorrente(false, "errore");
     }
 
     revalidatePath("/carrello");
@@ -352,11 +354,12 @@ export async function aggiornaQuantita(
       cappata = true;
     }
 
-    await supabase
+    const { error: errUpd } = await supabase
       .from("carrello_righe")
       .update({ quantita: finale })
       .eq("id", rigaId)
       .eq("carrello_id", cartId);
+    if (errUpd) return esitoCorrente(false, "errore");
 
     revalidatePath("/carrello");
 
@@ -387,11 +390,12 @@ export async function rimuoviDalCarrello(
       return esitoVuoto(false, "errore");
     }
 
-    await supabase
+    const { error: errDel } = await supabase
       .from("carrello_righe")
       .delete()
       .eq("id", rigaId)
       .eq("carrello_id", cartId);
+    if (errDel) return esitoCorrente(false, "errore");
 
     revalidatePath("/carrello");
     return esitoCorrente(true);
@@ -410,19 +414,22 @@ export async function svuotaCarrello(): Promise<EsitoCarrello> {
     const supabase = await createServerSupabase();
     const cartId = await leggiCartId();
 
+    let erroreDelete = false;
     if (supabase && cartId) {
-      await supabase
+      const { error } = await supabase
         .from("carrello_righe")
         .delete()
         .eq("carrello_id", cartId);
+      erroreDelete = !!error;
     }
 
-    // Azzera il cookie: la prossima aggiunta creera un carrello pulito.
+    // Azzera comunque il cookie: la prossima aggiunta creera un carrello pulito.
     const store = await cookies();
     store.delete(COOKIE_CARRELLO);
 
     revalidatePath("/carrello");
-    return esitoVuoto(true);
+    // Se il delete e fallito segnalalo, ma il cookie e gia stato azzerato.
+    return esitoVuoto(!erroreDelete, erroreDelete ? "errore" : undefined);
   } catch {
     return esitoVuoto(false, "errore");
   }

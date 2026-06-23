@@ -12,11 +12,6 @@ import nodemailer from "nodemailer";
 const SMTP_HOST = process.env.GMAIL_SMTP_HOST ?? "smtp.gmail.com";
 const SMTP_PORT = Number(process.env.GMAIL_SMTP_PORT ?? 465);
 
-/** True se le credenziali email sono presenti (altrimenti l'invio degrada). */
-export function emailConfigurata(): boolean {
-  return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
-}
-
 export interface EmailInput {
   to: string;
   subject: string;
@@ -41,6 +36,12 @@ export async function inviaEmail(input: EmailInput): Promise<boolean> {
     port: SMTP_PORT,
     secure: true,
     auth: { user, pass },
+    // Timeout espliciti: l'invio e awaited dentro Server Actions (conferma
+    // ordine / invia richiesta). Senza questi, uno stallo SMTP terrebbe bloccata
+    // l'azione fino al timeout della funzione serverless (default nodemailer ~10m).
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 15000,
   });
   try {
     await transporter.sendMail({

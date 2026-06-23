@@ -48,7 +48,7 @@ export default function FormLogin() {
       </div>
 
       {stato?.error && (
-        <p role="alert" className="text-sm font-medium text-coral">
+        <p role="alert" className="text-sm font-medium text-coral-ink">
           {stato.error}
         </p>
       )}

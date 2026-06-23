@@ -117,7 +117,7 @@ export default function BloccoRichiesta({
       </button>
 
       {errore && (
-        <p role="alert" className="text-sm font-semibold text-coral">
+        <p role="alert" className="text-sm font-semibold text-coral-ink">
           {errore}
         </p>
       )}

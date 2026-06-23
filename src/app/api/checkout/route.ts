@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { getStripe } from "@/lib/stripe";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import { leggiCarrello } from "@/lib/cart";
 import type { RigaCarrello } from "@/lib/types";
 
@@ -53,7 +53,17 @@ export async function POST(): Promise<Response> {
   // 2) Legge il carrello (degrada a [] se Supabase non e configurato).
   const righe = await leggiCarrello();
   if (righe.length === 0) {
-    return erroreJson("Il carrello e vuoto.", 400);
+    return erroreJson("Il carrello è vuoto.", 400);
+  }
+
+  // Articoli "su richiesta": niente pagamento diretto. Devono passare dal flusso
+  // richiesta -> conferma del gestore. Difesa lato server contro un checkout che
+  // aggirerebbe la conferma di disponibilita.
+  if (righe.some((riga) => riga.prodotto.disponibilita_su_richiesta)) {
+    return erroreJson(
+      "Alcuni articoli sono disponibili su richiesta: invia prima la richiesta dal carrello.",
+      409,
+    );
   }
 
   // 3) Prepara i line items dai prezzi in centesimi (currency eur).
@@ -96,20 +106,44 @@ export async function POST(): Promise<Response> {
       locale: "it",
     });
 
-    // 5) Salva un ordine "in_attesa" con lo stripe_session_id, se Supabase c'e.
-    //    Non blocca il checkout se il salvataggio fallisce: il webhook fa fede.
-    try {
-      const supabase = await createServerSupabase();
-      if (supabase) {
-        await supabase.from("ordini").insert({
-          stato: "in_attesa",
-          totale_cents: totaleCents,
-          email: session.customer_details?.email ?? null,
-          stripe_session_id: session.id,
-        });
+    // 5) Salva l'ordine "in_attesa" + le righe con lo stripe_session_id (client
+    //    ADMIN: `ordini` non ha policy anon, l'anon key verrebbe respinta dalla
+    //    RLS). Cosi il webhook AGGIORNA un record gia completo invece di ricrearlo
+    //    monco. Best effort: non blocca il checkout, il webhook resta autoritativo.
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const admin = createAdminSupabase();
+        const { data: ordine, error } = await admin
+          .from("ordini")
+          .insert({
+            stato: "in_attesa",
+            totale_cents: totaleCents,
+            email: session.customer_details?.email ?? null,
+            stripe_session_id: session.id,
+          })
+          .select("id")
+          .single();
+        if (error || !ordine) throw error ?? new Error("insert ordine vuoto");
+
+        const righeOrdine = righe.map((riga) => ({
+          ordine_id: ordine.id,
+          prodotto_id: riga.prodotto.id,
+          variante_id: riga.variante.id,
+          nome_prodotto: riga.prodotto.nome,
+          sku: riga.variante.sku,
+          taglia: riga.variante.taglia,
+          colore: riga.variante.colore,
+          prezzo_cents: riga.prodotto.prezzo_cents,
+          quantita: riga.quantita,
+        }));
+        const { error: errRighe } = await admin
+          .from("ordine_righe")
+          .insert(righeOrdine);
+        if (errRighe) throw errRighe;
+      } catch (err) {
+        // Best effort: il webhook creera/aggiornera l'ordine dalle line item.
+        console.error("[checkout] salvataggio ordine pre-pagamento fallito:", err);
       }
-    } catch {
-      // Il salvataggio dell'ordine e best effort: il webhook lo creera/aggiornera.
     }
 
     if (!session.url) {

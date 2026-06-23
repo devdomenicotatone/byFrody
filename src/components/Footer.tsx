@@ -32,7 +32,7 @@ export default function Footer() {
 
       <div className="mx-auto max-w-6xl px-5">
         <div className="grid gap-8 md:grid-cols-[1.4fr_1fr_1fr]">
-          {/* Brand + social */}
+          {/* Brand */}
           <div>
             <span className="wordmark text-2xl text-white [&_.wm-lead]:text-lagoon">
               <span className="wm-lead">Borracci</span>
@@ -42,42 +42,6 @@ export default function Footer() {
               Abbigliamento fresco e leggero, scelto uno a uno sul lungomare di
               Rimini.
             </p>
-            <div className="mt-4 flex gap-3">
-              <a
-                href="https://instagram.com"
-                aria-label="Instagram di Borracci Anna"
-                className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition duration-200 hover:-translate-y-0.5 hover:bg-coral"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                  className="h-5 w-5"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="5" />
-                  <circle cx="12" cy="12" r="4" />
-                  <circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
-                </svg>
-              </a>
-              <a
-                href="https://facebook.com"
-                aria-label="Facebook di Borracci Anna"
-                className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition duration-200 hover:-translate-y-0.5 hover:bg-coral"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden="true"
-                  className="h-5 w-5"
-                >
-                  <path d="M14 9h3V5.5h-3c-2.2 0-3.6 1.4-3.6 3.6V11H8v3.4h2.4V22h3.4v-7.6H16l.5-3.4h-2.7V9.4c0-.3.2-.4.5-.4Z" />
-                </svg>
-              </a>
-            </div>
           </div>
 
           {/* Dove e quando */}

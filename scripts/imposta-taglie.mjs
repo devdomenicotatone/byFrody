@@ -22,6 +22,12 @@ function leggiEnv(file) {
 }
 
 const env = { ...leggiEnv(".env.local"), ...process.env };
+if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error(
+    "Mancano NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (.env.local).",
+  );
+  process.exit(1);
+}
 const admin = createClient(
   env.NEXT_PUBLIC_SUPABASE_URL,
   env.SUPABASE_SERVICE_ROLE_KEY,

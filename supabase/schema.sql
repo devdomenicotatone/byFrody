@@ -68,6 +68,8 @@ create table if not exists public.carrello_righe (
 );
 
 create index if not exists idx_carrello_righe_carrello on public.carrello_righe (carrello_id);
+create index if not exists idx_carrello_righe_prodotto on public.carrello_righe (prodotto_id);
+create index if not exists idx_carrello_righe_variante on public.carrello_righe (variante_id);
 
 -- Ordini ---------------------------------------------------------------------
 create table if not exists public.ordini (
@@ -83,6 +85,9 @@ create table if not exists public.ordini (
   token              text,
   confermato_il      timestamptz,
   stripe_session_id  text unique,
+  -- Idempotenza del decremento stock (vedi finalizza_ordine_pagato). Migration
+  -- 20260623200000.
+  stock_scalato      boolean not null default false,
   creato_il          timestamptz not null default now()
 );
 -- Idempotente per i DB gia creati. Vedi migration 20260623180000.
@@ -95,6 +100,7 @@ alter table public.ordini add column if not exists telefono text;
 alter table public.ordini add column if not exists note text;
 alter table public.ordini add column if not exists token text;
 alter table public.ordini add column if not exists confermato_il timestamptz;
+alter table public.ordini add column if not exists stock_scalato boolean not null default false;
 
 create index if not exists idx_ordini_stato on public.ordini (stato);
 create unique index if not exists idx_ordini_token on public.ordini (token);
@@ -118,6 +124,8 @@ alter table public.ordine_righe add column if not exists taglia text;
 alter table public.ordine_righe add column if not exists colore text;
 
 create index if not exists idx_ordine_righe_ordine on public.ordine_righe (ordine_id);
+create index if not exists idx_ordine_righe_prodotto on public.ordine_righe (prodotto_id);
+create index if not exists idx_ordine_righe_variante on public.ordine_righe (variante_id);
 
 -- ============================================================================
 -- ROW LEVEL SECURITY
@@ -178,6 +186,97 @@ create policy "carrello_righe_all"
 -- Ordini e righe d'ordine: NESSUNA policy per anon/auth.
 -- => non leggibili/scrivibili col client pubblico. Solo il service role
 --    (webhook Stripe, createAdminSupabase) puo operarvi, bypassando la RLS.
+
+-- Finalizzazione ordini atomica/idempotente (vedi migration 20260623200000).
+create or replace function public.finalizza_ordine_pagato(
+  p_session_id text,
+  p_email      text,
+  p_total      integer,
+  p_righe      jsonb
+) returns void
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+declare
+  v_ordine public.ordini%rowtype;
+  v_riga   jsonb;
+begin
+  select * into v_ordine
+    from public.ordini
+   where stripe_session_id = p_session_id
+   for update;
+
+  if not found then
+    insert into public.ordini (stato, totale_cents, email, stripe_session_id, stock_scalato)
+    values ('pagato', coalesce(p_total, 0), p_email, p_session_id, false)
+    on conflict (stripe_session_id) do nothing
+    returning * into v_ordine;
+    if not found then
+      select * into v_ordine from public.ordini
+       where stripe_session_id = p_session_id for update;
+    end if;
+  end if;
+
+  if v_ordine.stato = 'pagato' and v_ordine.stock_scalato then
+    return;
+  end if;
+
+  for v_riga in select * from jsonb_array_elements(coalesce(p_righe, '[]'::jsonb))
+  loop
+    update public.varianti
+       set stock = greatest(0, stock - greatest(0, coalesce((v_riga->>'qta')::int, 0)))
+     where sku = (v_riga->>'sku');
+  end loop;
+
+  update public.ordini
+     set stato = 'pagato',
+         email = coalesce(p_email, email),
+         stock_scalato = true
+   where id = v_ordine.id;
+end;
+$$;
+revoke all on function public.finalizza_ordine_pagato(text, text, integer, jsonb) from public;
+grant execute on function public.finalizza_ordine_pagato(text, text, integer, jsonb) to service_role;
+
+create or replace function public.segna_ordine_pagato_manuale(
+  p_ordine_id uuid
+) returns void
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+declare
+  v_ordine public.ordini%rowtype;
+begin
+  select * into v_ordine from public.ordini where id = p_ordine_id for update;
+  if not found then
+    raise exception 'Ordine inesistente.';
+  end if;
+  if v_ordine.stato = 'pagato' then
+    return;
+  end if;
+  if v_ordine.stato not in ('in_attesa', 'confermato') then
+    raise exception 'Transizione non consentita da % a pagato.', v_ordine.stato;
+  end if;
+  if not v_ordine.stock_scalato then
+    update public.varianti v
+       set stock = greatest(0, v.stock - agg.qta)
+      from (
+        select variante_id, sum(quantita)::int as qta
+          from public.ordine_righe
+         where ordine_id = p_ordine_id and variante_id is not null
+         group by variante_id
+      ) agg
+     where agg.variante_id = v.id;
+  end if;
+  update public.ordini
+     set stato = 'pagato', stock_scalato = true
+   where id = v_ordine.id;
+end;
+$$;
+revoke all on function public.segna_ordine_pagato_manuale(uuid) from public;
+grant execute on function public.segna_ordine_pagato_manuale(uuid) to service_role;
 
 -- ============================================================================
 -- DATI DI ESEMPIO (basics casual) - upsert idempotente per slug

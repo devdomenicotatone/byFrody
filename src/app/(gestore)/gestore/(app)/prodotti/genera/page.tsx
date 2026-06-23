@@ -1,6 +1,6 @@
 import { requireGestore } from "@/lib/gestore/auth";
 import GeneraDaFoto from "@/components/gestore/GeneraDaFoto";
-import type { Categoria } from "@/lib/types";
+import { caricaCategorie } from "@/lib/categorie";
 
 // La generazione AI (vision) puo durare alcune decine di secondi: alziamo il
 // limite della funzione serverless (la Server Action gira in questa route).
@@ -8,12 +8,7 @@ export const maxDuration = 60;
 
 export default async function GeneraSchedaPage() {
   const { supabase } = await requireGestore();
-
-  const { data } = await supabase
-    .from("categorie")
-    .select("id, slug, nome, parent_id, ordine")
-    .order("ordine", { ascending: true });
-  const categorie = (data as Categoria[] | null) ?? [];
+  const categorie = await caricaCategorie(supabase);
 
   return (
     <div>

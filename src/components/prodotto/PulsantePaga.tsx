@@ -47,7 +47,7 @@ export default function PulsantePaga({ token }: { token: string }) {
         {inCorso ? "Avvio pagamento…" : "Paga ora"}
       </button>
       {errore && (
-        <p role="alert" className="text-sm font-semibold text-coral">
+        <p role="alert" className="text-sm font-semibold text-coral-ink">
           {errore}
         </p>
       )}

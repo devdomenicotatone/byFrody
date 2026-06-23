@@ -17,10 +17,31 @@ const poppins = Poppins({
   display: "swap",
 });
 
+const TITOLO = "Borracci Anna — moda fresca sul lungomare di Rimini";
+const DESCRIZIONE =
+  "Borracci Anna: abbigliamento fresco e leggero, scelto uno a uno. Vieni a trovarci sul lungomare di Rimini o ricevi i capi comodamente a casa.";
+
 export const metadata: Metadata = {
-  title: "Borracci Anna — moda fresca sul lungomare di Rimini",
-  description:
-    "Borracci Anna: abbigliamento fresco e leggero, scelto uno a uno. Vieni a trovarci sul lungomare di Rimini o ricevi i capi comodamente a casa.",
+  // metadataBase risolve gli URL relativi di OpenGraph/canonical. In assenza di
+  // NEXT_PUBLIC_SITE_URL si degrada a localhost (build/anteprima).
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  ),
+  // Le pagine figlie con titolo proprio diventano "Titolo · Borracci Anna".
+  title: { default: TITOLO, template: "%s · Borracci Anna" },
+  description: DESCRIZIONE,
+  openGraph: {
+    title: TITOLO,
+    description: DESCRIZIONE,
+    type: "website",
+    locale: "it_IT",
+    siteName: "Borracci Anna",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITOLO,
+    description: DESCRIZIONE,
+  },
 };
 
 // Root layout MINIMALE: emette solo <html>/<body> + font + metadata globale.

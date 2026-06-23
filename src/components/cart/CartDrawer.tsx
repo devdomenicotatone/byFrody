@@ -127,7 +127,7 @@ export default function CartDrawer() {
               🏖️
             </div>
             <p className="font-display text-base font-bold text-foreground">
-              Il carrello e vuoto
+              Il carrello è vuoto
             </p>
             <button
               type="button"
@@ -164,7 +164,19 @@ export default function CartDrawer() {
               </p>
 
               <div className="mt-4">
-                <CheckoutButton />
+                {/* Carrello con articoli su richiesta: niente pagamento diretto,
+                    si passa dal flusso richiesta (coerente con /carrello). */}
+                {righe.some((r) => r.prodotto.disponibilita_su_richiesta) ? (
+                  <Link
+                    href="/carrello"
+                    onClick={chiudiDrawer}
+                    className="flex h-12 w-full items-center justify-center rounded-full bg-sea px-6 font-display font-bold text-white shadow-sea transition-transform hover:-translate-y-0.5"
+                  >
+                    Procedi con la richiesta
+                  </Link>
+                ) : (
+                  <CheckoutButton />
+                )}
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-3">

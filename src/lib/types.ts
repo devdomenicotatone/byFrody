@@ -91,7 +91,7 @@ export interface EsitoCarrello {
   subtotaleCents: number;
   valuta: string;
   avviso?: string;
-  motivo?: "non_configurato" | "esaurito" | "stock_insufficiente" | "errore";
+  motivo?: "non_configurato" | "esaurito" | "errore";
 }
 
 /**
@@ -101,6 +101,19 @@ export interface EsitoCarrello {
  * pagato     = pagato; annullato = rifiutato/annullato.
  */
 export type StatoOrdine = "in_attesa" | "confermato" | "pagato" | "annullato";
+
+/** Elenco dei valori validi di StatoOrdine (utile per validazione/iterazione). */
+export const STATI_ORDINE: readonly StatoOrdine[] = [
+  "in_attesa",
+  "confermato",
+  "pagato",
+  "annullato",
+];
+
+/** Type guard runtime: vero se `v` e uno StatoOrdine valido. */
+export function isStatoOrdine(v: unknown): v is StatoOrdine {
+  return typeof v === "string" && (STATI_ORDINE as readonly string[]).includes(v);
+}
 
 /** Un ordine cliente. */
 export interface Ordine {

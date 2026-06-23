@@ -229,7 +229,7 @@ export async function generaSchedaDaFotoAction(
     const colori: BozzaColore[] = (raw.colori ?? [])
       .filter((c) => c && c.nome && c.nome.trim())
       .map((c) => ({
-        nome: c.nome!.trim(),
+        nome: (c.nome ?? "").trim(),
         foto_indici: (c.foto_prodotto_indici ?? []).filter(
           (n) => Number.isInteger(n) && n >= 0 && n < prodotto.length,
         ),

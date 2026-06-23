@@ -68,6 +68,33 @@ const PRODOTTI = [
   { slug: "polo-fantasia-celeste", nome: "Polo bottoniera fantasia — Celeste", colore: "Celeste", modello: "fantasia", foto: "1782153695743_20260622_203619.jpg" },
 ];
 
+// Guardia distruttiva: questo script CANCELLA tutti i prodotti (e via CASCADE le
+// varianti e le righe di carrello; le righe d'ordine restano ma perdono il
+// riferimento per ON DELETE SET NULL). Richiede --apply e si rifiuta di
+// procedere se esistono ordini reali.
+if (!process.argv.includes("--apply")) {
+  console.error(
+    "Operazione distruttiva: cancella TUTTI i prodotti del catalogo.\n" +
+      "Rilancia con --apply per confermare:  node scripts/seed-catalogo.mjs --apply",
+  );
+  process.exit(1);
+}
+
+const { count: ordiniEsistenti, error: countErr } = await admin
+  .from("ordini")
+  .select("id", { count: "exact", head: true });
+if (countErr) {
+  console.error("Impossibile verificare gli ordini esistenti:", countErr.message);
+  process.exit(1);
+}
+if ((ordiniEsistenti ?? 0) > 0) {
+  console.error(
+    `Ci sono ${ordiniEsistenti} ordini nel database: svuotare il catalogo ` +
+      "scollegherebbe le righe d'ordine. Operazione annullata.",
+  );
+  process.exit(1);
+}
+
 // 1. Svuota i prodotti esistenti (le varianti spariscono via ON DELETE CASCADE).
 const { error: delErr } = await admin
   .from("prodotti")
