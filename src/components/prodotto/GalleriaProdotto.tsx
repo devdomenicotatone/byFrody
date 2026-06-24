@@ -66,6 +66,9 @@ export default function GalleriaProdotto({
             fill
             sizes="(max-width: 768px) 100vw, 50vw"
             className="object-cover"
+            // Foto grande della scheda: quality alta cosi l'ottimizzazione non
+            // somma una seconda perdita visibile sopra la foto gia caricata.
+            quality={90}
             // Foto LCP della PDP: caricala subito e con priorita alta. In Next 16
             // `priority` e deprecato -> loading="eager" + fetchPriority="high".
             loading="eager"

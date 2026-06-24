@@ -55,8 +55,12 @@ export default function GestoreGalleria({
       }
       try {
         const compressa = await imageCompression(file, {
+          // Qualita alta: 1600px e il massimo che la PDP serve, e con initialQuality
+          // alto + tetto MB generoso la foto resta nitida (no quality buttata giu
+          // per centrare un file minuscolo).
           maxWidthOrHeight: 1600,
-          maxSizeMB: 1,
+          maxSizeMB: 2.5,
+          initialQuality: 0.86,
           fileType: "image/webp",
           useWebWorker: true,
         });

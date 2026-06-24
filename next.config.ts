@@ -12,10 +12,18 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
-    // Next 16 richiede di dichiarare esplicitamente le quality ammesse.
-    qualities: [75],
-    // Le foto sono caricate a max 1600px (1400 per "Genera da foto"): l'optimizer
-    // non produce varianti utili oltre quella soglia. Togliamo i breakpoint piu
+    // AVIF preferita, WebP come fallback. next/image negozia col browser via
+    // header Accept: chi supporta AVIF (Chrome/Firefox/Edge/Safari 16.4+) la
+    // riceve — piu leggera a parita di nitidezza; gli altri ricevono WebP.
+    // Il primo encode AVIF e piu lento, ma la cache (30g + cache-bust ?v=) lo
+    // paga una volta sola per ciascuna dimensione.
+    formats: ["image/avif", "image/webp"],
+    // Next 16 richiede di dichiarare esplicitamente le quality ammesse. 75 per
+    // miniature/carrello (piccole, irrilevanti); 90 per la foto grande della PDP,
+    // cosi l'ottimizzazione non aggiunge una seconda perdita visibile sulla foto.
+    qualities: [75, 90],
+    // Le foto sono caricate a max 1600px: l'optimizer non produce varianti utili
+    // oltre quella soglia. Togliamo i breakpoint piu
     // grandi del default (1920/2048/3840) per non sprecare encode + cache a freddo
     // — nessuna immagine del sito viene servita oltre i 1600px.
     deviceSizes: [640, 750, 828, 1080, 1200, 1600],

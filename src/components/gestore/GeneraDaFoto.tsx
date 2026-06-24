@@ -40,9 +40,13 @@ const inputCls =
 const MAX_FOTO = 10;
 
 async function comprimi(file: File): Promise<File> {
+  // Queste foto diventano anche la GALLERIA del prodotto, non solo input per
+  // l'AI: quindi qualita alta (1600px, initialQuality 0.82). Il tetto a 1 MB
+  // tiene la richiesta entro il limite body della Server Action (<=10 foto).
   return imageCompression(file, {
-    maxWidthOrHeight: 1400,
-    maxSizeMB: 0.6,
+    maxWidthOrHeight: 1600,
+    maxSizeMB: 1,
+    initialQuality: 0.82,
     fileType: "image/webp",
     useWebWorker: true,
   });
