@@ -15,7 +15,7 @@ export default async function OrdiniPage() {
   const { data } = await admin
     .from("ordini")
     .select(
-      "id, stato, totale_cents, nome, email, telefono, note, token, confermato_il, creato_il, ordine_righe(nome_prodotto, taglia, colore, prezzo_cents, quantita)",
+      "id, stato, totale_cents, costo_spedizione_cents, nome, email, telefono, note, token, confermato_il, creato_il, ordine_righe(nome_prodotto, taglia, colore, prezzo_cents, quantita)",
     )
     .order("creato_il", { ascending: false })
     .limit(200);

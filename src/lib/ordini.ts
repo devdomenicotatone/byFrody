@@ -185,7 +185,7 @@ export async function creaCheckoutOrdineAction(
     const admin = createAdminSupabase();
     const { data: ordine } = await admin
       .from("ordini")
-      .select("id, stato")
+      .select("id, stato, costo_spedizione_cents")
       .eq("token", token)
       .maybeSingle();
     if (!ordine) return { ok: false, error: "Ordine non trovato." };
@@ -216,10 +216,28 @@ export async function creaCheckoutOrdineAction(
       },
     }));
 
+    // Spedizione gia concordata dal gestore in fase di conferma: la passiamo
+    // come opzione fissa (un'unica voce), cosi Stripe la incassa e il webhook la
+    // persiste come nel flusso diretto. 0/null = nessun addebito spedizione.
+    const spedizioneCents = ordine.costo_spedizione_cents ?? 0;
+    const shippingOptions =
+      spedizioneCents > 0
+        ? [
+            {
+              shipping_rate_data: {
+                type: "fixed_amount" as const,
+                display_name: "Spedizione",
+                fixed_amount: { amount: spedizioneCents, currency: "eur" },
+              },
+            },
+          ]
+        : undefined;
+
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
+      ...(shippingOptions ? { shipping_options: shippingOptions } : {}),
       success_url: `${siteUrl}/ordine/${token}?pagato=1`,
       cancel_url: `${siteUrl}/ordine/${token}`,
       client_reference_id: ordine.id,

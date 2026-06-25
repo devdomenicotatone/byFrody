@@ -167,6 +167,8 @@ export interface Database {
           confermato_il: string | null;
           stripe_session_id: string | null;
           stock_scalato: boolean;
+          costo_spedizione_cents: number | null;
+          spedizione_indirizzo: Json | null;
           creato_il: string;
         };
         Insert: {
@@ -181,6 +183,8 @@ export interface Database {
           confermato_il?: string | null;
           stripe_session_id?: string | null;
           stock_scalato?: boolean;
+          costo_spedizione_cents?: number | null;
+          spedizione_indirizzo?: Json | null;
           creato_il?: string;
         };
         Update: {
@@ -195,6 +199,8 @@ export interface Database {
           confermato_il?: string | null;
           stripe_session_id?: string | null;
           stock_scalato?: boolean;
+          costo_spedizione_cents?: number | null;
+          spedizione_indirizzo?: Json | null;
           creato_il?: string;
         };
         Relationships: [];
@@ -374,6 +380,8 @@ export interface Database {
           p_email: string | null;
           p_total: number;
           p_righe: Json;
+          p_shipping_cents?: number | null;
+          p_indirizzo?: Json | null;
         };
         Returns: undefined;
       };

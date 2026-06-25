@@ -30,6 +30,7 @@ interface OrdineDettaglio {
   id: string;
   stato: StatoOrdine;
   totale_cents: number;
+  costo_spedizione_cents: number | null;
   nome: string | null;
   email: string | null;
   creato_il: string;
@@ -42,7 +43,7 @@ async function caricaOrdine(token: string): Promise<OrdineDettaglio | null> {
     const { data, error } = await admin
       .from("ordini")
       .select(
-        "id, stato, totale_cents, nome, email, creato_il, ordine_righe(nome_prodotto, taglia, colore, prezzo_cents, quantita)",
+        "id, stato, totale_cents, costo_spedizione_cents, nome, email, creato_il, ordine_righe(nome_prodotto, taglia, colore, prezzo_cents, quantita)",
       )
       .eq("token", token)
       .maybeSingle();
@@ -53,6 +54,7 @@ async function caricaOrdine(token: string): Promise<OrdineDettaglio | null> {
       id: data.id,
       stato: data.stato,
       totale_cents: data.totale_cents,
+      costo_spedizione_cents: data.costo_spedizione_cents,
       nome: data.nome,
       email: data.email,
       creato_il: data.creato_il,
@@ -112,6 +114,15 @@ export default async function PaginaOrdine({
   const ui = STATO_UI[ordine.stato];
   // Reduce dal pagamento Stripe: il webhook potrebbe non aver ancora aggiornato.
   const inElaborazione = pagato === "1" && ordine.stato !== "pagato";
+  // Breakdown: merce (somma righe) + spedizione (concordata dal gestore in
+  // conferma; null finche in attesa) = totale. Etichetta "stimato" finche non
+  // confermato.
+  const merceCents = ordine.righe.reduce(
+    (acc, r) => acc + r.prezzo_cents * r.quantita,
+    0,
+  );
+  const spedizioneCents = ordine.costo_spedizione_cents;
+  const totaleStimato = ordine.stato === "in_attesa";
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-12 sm:px-6">
@@ -176,16 +187,37 @@ export default async function PaginaOrdine({
             );
           })}
         </ul>
-        <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
+        <div className="mt-4 space-y-2 border-t border-line pt-4">
+          <div className="flex items-center justify-between text-sm text-muted">
+            <span>Subtotale</span>
+            <span className="tabular-nums text-foreground">
+              {formatPrezzo(merceCents)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm text-muted">
+            <span>Spedizione</span>
+            <span className="tabular-nums text-foreground">
+              {spedizioneCents == null
+                ? "Da concordare"
+                : spedizioneCents > 0
+                  ? formatPrezzo(spedizioneCents)
+                  : "Gratuita"}
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
           <span className="font-display font-bold text-foreground">
-            Totale stimato
+            {totaleStimato ? "Totale stimato" : "Totale"}
           </span>
           <span className="font-display text-xl font-extrabold text-sea">
             {formatPrezzo(ordine.totale_cents)}
           </span>
         </div>
         <p className="mt-2 text-xs text-muted">
-          Spedizione/ritiro da concordare. Intestato a {ordine.nome ?? "—"}.
+          Intestato a {ordine.nome ?? "—"}.
+          {spedizioneCents == null
+            ? " La spedizione viene concordata alla conferma."
+            : ""}
         </p>
       </section>
 

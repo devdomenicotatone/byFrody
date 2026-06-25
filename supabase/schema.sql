@@ -88,6 +88,12 @@ create table if not exists public.ordini (
   -- Idempotenza del decremento stock (vedi finalizza_ordine_pagato). Migration
   -- 20260623200000.
   stock_scalato      boolean not null default false,
+  -- Spedizione (migration 20260625100000): costo incassato via Stripe
+  -- shipping_options + indirizzo scelto dal cliente. NULL finche ignoti
+  -- (pre-pagamento / richiesta non confermata).
+  costo_spedizione_cents integer
+    check (costo_spedizione_cents is null or costo_spedizione_cents >= 0),
+  spedizione_indirizzo   jsonb,
   creato_il          timestamptz not null default now()
 );
 -- Idempotente per i DB gia creati. Vedi migration 20260623180000.
@@ -101,6 +107,8 @@ alter table public.ordini add column if not exists note text;
 alter table public.ordini add column if not exists token text;
 alter table public.ordini add column if not exists confermato_il timestamptz;
 alter table public.ordini add column if not exists stock_scalato boolean not null default false;
+alter table public.ordini add column if not exists costo_spedizione_cents integer;
+alter table public.ordini add column if not exists spedizione_indirizzo jsonb;
 
 create index if not exists idx_ordini_stato on public.ordini (stato);
 create unique index if not exists idx_ordini_token on public.ordini (token);
@@ -187,12 +195,16 @@ create policy "carrello_righe_all"
 -- => non leggibili/scrivibili col client pubblico. Solo il service role
 --    (webhook Stripe, createAdminSupabase) puo operarvi, bypassando la RLS.
 
--- Finalizzazione ordini atomica/idempotente (vedi migration 20260623200000).
+-- Finalizzazione ordini atomica/idempotente (migration 20260623200000) +
+-- persistenza costo spedizione/indirizzo (migration 20260625100000).
+drop function if exists public.finalizza_ordine_pagato(text, text, integer, jsonb);
 create or replace function public.finalizza_ordine_pagato(
-  p_session_id text,
-  p_email      text,
-  p_total      integer,
-  p_righe      jsonb
+  p_session_id     text,
+  p_email          text,
+  p_total          integer,
+  p_righe          jsonb,
+  p_shipping_cents integer default null,
+  p_indirizzo      jsonb   default null
 ) returns void
   language plpgsql
   security definer
@@ -208,8 +220,14 @@ begin
    for update;
 
   if not found then
-    insert into public.ordini (stato, totale_cents, email, stripe_session_id, stock_scalato)
-    values ('pagato', coalesce(p_total, 0), p_email, p_session_id, false)
+    insert into public.ordini (
+      stato, totale_cents, email, stripe_session_id, stock_scalato,
+      costo_spedizione_cents, spedizione_indirizzo
+    )
+    values (
+      'pagato', coalesce(p_total, 0), p_email, p_session_id, false,
+      p_shipping_cents, p_indirizzo
+    )
     on conflict (stripe_session_id) do nothing
     returning * into v_ordine;
     if not found then
@@ -232,12 +250,15 @@ begin
   update public.ordini
      set stato = 'pagato',
          email = coalesce(p_email, email),
-         stock_scalato = true
+         stock_scalato = true,
+         totale_cents = coalesce(p_total, totale_cents),
+         costo_spedizione_cents = coalesce(p_shipping_cents, costo_spedizione_cents),
+         spedizione_indirizzo = coalesce(p_indirizzo, spedizione_indirizzo)
    where id = v_ordine.id;
 end;
 $$;
-revoke all on function public.finalizza_ordine_pagato(text, text, integer, jsonb) from public;
-grant execute on function public.finalizza_ordine_pagato(text, text, integer, jsonb) to service_role;
+revoke all on function public.finalizza_ordine_pagato(text, text, integer, jsonb, integer, jsonb) from public;
+grant execute on function public.finalizza_ordine_pagato(text, text, integer, jsonb, integer, jsonb) to service_role;
 
 create or replace function public.segna_ordine_pagato_manuale(
   p_ordine_id uuid

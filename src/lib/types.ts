@@ -117,12 +117,29 @@ export function isStatoOrdine(v: unknown): v is StatoOrdine {
   return typeof v === "string" && (STATI_ORDINE as readonly string[]).includes(v);
 }
 
+/** Indirizzo di spedizione scelto dal cliente su Stripe (persistito sull'ordine). */
+export interface IndirizzoSpedizione {
+  nome: string | null;
+  indirizzo: {
+    line1: string | null;
+    line2: string | null;
+    cap: string | null;
+    citta: string | null;
+    provincia: string | null;
+    paese: string | null;
+  } | null;
+}
+
 /** Un ordine cliente. */
 export interface Ordine {
   id: string;
   stato: StatoOrdine;
-  /** Totale in centesimi di euro. */
+  /** Totale in centesimi di euro (merce + spedizione, una volta pagato). */
   totale_cents: number;
+  /** Costo di spedizione in centesimi, incassato via Stripe. null se ignoto. */
+  costo_spedizione_cents: number | null;
+  /** Indirizzo di spedizione scelto su Stripe. null finche non pagato. */
+  spedizione_indirizzo: IndirizzoSpedizione | null;
   email: string | null;
   /** Dati cliente della richiesta. */
   nome: string | null;

@@ -28,6 +28,7 @@ export interface OrdineGestore {
   id: string;
   stato: StatoOrdine;
   totale_cents: number;
+  costo_spedizione_cents: number | null;
   nome: string | null;
   email: string | null;
   telefono: string | null;
@@ -36,6 +37,13 @@ export interface OrdineGestore {
   confermato_il: string | null;
   creato_il: string;
   ordine_righe: RigaOrdine[] | null;
+}
+
+/** Converte un importo in euro digitato (es. "5,90" o "5.90") in centesimi. */
+function euroToCents(raw: string): number | null {
+  const n = Number.parseFloat(raw.replace(",", ".").trim());
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 100);
 }
 
 type Filtro = "in_attesa" | "confermato" | "pagato" | "annullato" | "tutti";
@@ -69,6 +77,10 @@ export default function ListaOrdini({ ordini }: { ordini: OrdineGestore[] }) {
   const [lista, setLista] = useState<OrdineGestore[]>(ordini);
   const [filtro, setFiltro] = useState<Filtro>("in_attesa");
   const [pending, startTransition] = useTransition();
+  // Costo spedizione (in euro, come digitato) per ordine in conferma. Default
+  // 5,90 = tariffa Italia continentale; il gestore lo regola caso per caso.
+  const [sped, setSped] = useState<Record<string, string>>({});
+  const valoreSped = (id: string) => sped[id] ?? "5,90";
 
   const conteggi = useMemo(() => {
     const c: Record<string, number> = {};
@@ -97,6 +109,38 @@ export default function ListaOrdini({ ordini }: { ordini: OrdineGestore[] }) {
         l.map((o) => (o.id === id ? { ...o, stato: nuovoStato } : o)),
       );
       mostra(successo, "ok");
+    });
+  }
+
+  function confermaConSpedizione(o: OrdineGestore) {
+    const cents = euroToCents(valoreSped(o.id));
+    if (cents === null || cents > 10_000) {
+      mostra("Inserisci un costo di spedizione valido (0–100 €).", "errore");
+      return;
+    }
+    startTransition(async () => {
+      const esito = await confermaOrdineAction(o.id, cents);
+      if (!esito.ok) {
+        mostra(esito.error ?? "Operazione non riuscita.", "errore");
+        return;
+      }
+      const merce = (o.ordine_righe ?? []).reduce(
+        (acc, r) => acc + r.prezzo_cents * r.quantita,
+        0,
+      );
+      setLista((l) =>
+        l.map((x) =>
+          x.id === o.id
+            ? {
+                ...x,
+                stato: "confermato",
+                costo_spedizione_cents: cents,
+                totale_cents: merce + cents,
+              }
+            : x,
+        ),
+      );
+      mostra("Disponibilità confermata.", "ok");
     });
   }
 
@@ -226,13 +270,36 @@ export default function ListaOrdini({ ordini }: { ordini: OrdineGestore[] }) {
                 )}
 
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="font-display text-sm font-bold tabular-nums text-sea">
-                    {formatPrezzo(o.totale_cents)}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="font-display text-sm font-bold tabular-nums text-sea">
+                      {formatPrezzo(o.totale_cents)}
+                    </span>
+                    {o.costo_spedizione_cents != null && (
+                      <span className="text-[11px] text-muted">
+                        {o.costo_spedizione_cents > 0
+                          ? `incl. spedizione ${formatPrezzo(o.costo_spedizione_cents)}`
+                          : "spedizione gratuita"}
+                      </span>
+                    )}
+                  </div>
 
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     {o.stato === "in_attesa" && (
                       <>
+                        <label className="inline-flex items-center gap-1.5 text-xs font-bold text-muted">
+                          Spedizione €
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={valoreSped(o.id)}
+                            onChange={(e) =>
+                              setSped((s) => ({ ...s, [o.id]: e.target.value }))
+                            }
+                            disabled={pending}
+                            aria-label="Costo spedizione in euro"
+                            className="w-16 rounded-full border border-line bg-white px-3 py-1.5 text-right tabular-nums text-foreground focus:border-sea focus:outline-none disabled:opacity-50"
+                          />
+                        </label>
                         <button
                           type="button"
                           disabled={pending}
@@ -251,14 +318,7 @@ export default function ListaOrdini({ ordini }: { ordini: OrdineGestore[] }) {
                         <button
                           type="button"
                           disabled={pending}
-                          onClick={() =>
-                            esegui(
-                              o.id,
-                              confermaOrdineAction,
-                              "confermato",
-                              "Disponibilità confermata.",
-                            )
-                          }
+                          onClick={() => confermaConSpedizione(o)}
                           className="rounded-full bg-sea px-4 py-2 text-xs font-bold text-white shadow-sea transition-all hover:-translate-y-0.5 disabled:opacity-50"
                         >
                           Conferma disponibilità

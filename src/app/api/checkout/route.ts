@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 import { getStripe } from "@/lib/stripe";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { leggiCarrello } from "@/lib/cart";
+import { opzioniSpedizione } from "@/lib/spedizione";
 import type { RigaCarrello } from "@/lib/types";
 
 /** Costruisce un'etichetta leggibile per una riga (nome + taglia/colore). */
@@ -92,6 +93,21 @@ export async function POST(): Promise<Response> {
     0,
   );
 
+  // Opzioni di spedizione: calcolate server-side dal subtotale merce (fonte di
+  // verita = carrello server-side, mai input del client). Stripe le mostra come
+  // scelte sulla pagina hosted; il costo reale scelto torna nel webhook.
+  const shippingOptions = opzioniSpedizione(totaleCents).map((opzione) => ({
+    shipping_rate_data: {
+      type: "fixed_amount" as const,
+      display_name: opzione.etichetta,
+      fixed_amount: { amount: opzione.costoCents, currency: "eur" },
+      delivery_estimate: {
+        minimum: { unit: "business_day" as const, value: 2 },
+        maximum: { unit: "business_day" as const, value: 5 },
+      },
+    },
+  }));
+
   try {
     const stripe = getStripe();
 
@@ -99,6 +115,7 @@ export async function POST(): Promise<Response> {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
+      shipping_options: shippingOptions,
       success_url: `${siteUrl}/checkout/successo?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/checkout/annullato`,
       billing_address_collection: "auto",

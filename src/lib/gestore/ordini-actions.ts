@@ -16,8 +16,12 @@ import { verifySession } from "@/lib/gestore/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { inviaEmail } from "@/lib/email";
 import { NEGOZIO } from "@/lib/negozio";
+import { formatPrezzo } from "@/lib/format";
 import type { StatoOrdine } from "@/lib/types";
 import type { Database } from "@/lib/supabase/database.types";
+
+/** Cap di sicurezza per il costo di spedizione inserito dal gestore (100 EUR). */
+const MAX_SPEDIZIONE_CENTS = 10_000;
 
 export interface EsitoOrdine {
   ok: boolean;
@@ -62,17 +66,54 @@ async function aggiornaStato(
 /**
  * Conferma la disponibilita: l'ordine passa a "confermato" e diventa pagabile.
  * Solo da "in_attesa" (un ordine gia pagato/annullato non si ri-conferma, cosi
- * non puo tornare pagabile dopo il pagamento). Notifica il cliente (best effort).
+ * non puo tornare pagabile dopo il pagamento).
+ *
+ * In questo flusso "su richiesta" la spedizione e CONCORDATA: il gestore fissa
+ * qui `costoSpedizioneCents` (0 = gratis). Il totale viene ricalcolato come
+ * merce (somma delle righe d'ordine, fonte di verita) + spedizione, cosi un
+ * doppio click o un valore vecchio non si sommano mai. Notifica il cliente con
+ * l'importo finale (best effort).
  */
-export async function confermaOrdineAction(id: string): Promise<EsitoOrdine> {
+export async function confermaOrdineAction(
+  id: string,
+  costoSpedizioneCents: number,
+): Promise<EsitoOrdine> {
   const sessione = await verifySession();
   if (!sessione) return { ok: false, error: "Non autorizzato." };
 
+  // Input dal pannello gestore: validare comunque server-side.
+  if (
+    !Number.isInteger(costoSpedizioneCents) ||
+    costoSpedizioneCents < 0 ||
+    costoSpedizioneCents > MAX_SPEDIZIONE_CENTS
+  ) {
+    return { ok: false, error: "Costo di spedizione non valido (0–100 €)." };
+  }
+
   try {
     const admin = createAdminSupabase();
+
+    // Merce = somma delle righe (snapshot): il totale non dipende dal valore
+    // gia presente su `ordini`, quindi e ricalcolabile in modo idempotente.
+    const { data: righe, error: errRighe } = await admin
+      .from("ordine_righe")
+      .select("prezzo_cents, quantita")
+      .eq("ordine_id", id);
+    if (errRighe) return { ok: false, error: errRighe.message };
+    const merceCents = (righe ?? []).reduce(
+      (acc, r) => acc + r.prezzo_cents * r.quantita,
+      0,
+    );
+    const totaleCents = merceCents + costoSpedizioneCents;
+
     const { data: ordine, error } = await admin
       .from("ordini")
-      .update({ stato: "confermato", confermato_il: new Date().toISOString() })
+      .update({
+        stato: "confermato",
+        confermato_il: new Date().toISOString(),
+        costo_spedizione_cents: costoSpedizioneCents,
+        totale_cents: totaleCents,
+      })
       .eq("id", id)
       .eq("stato", "in_attesa")
       .select("email, nome, token")
@@ -89,10 +130,14 @@ export async function confermaOrdineAction(id: string): Promise<EsitoOrdine> {
 
     if (ordine.email && ordine.token) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+      const rigaSped =
+        costoSpedizioneCents > 0
+          ? `Spedizione: ${formatPrezzo(costoSpedizioneCents)}`
+          : "Spedizione: gratuita";
       await inviaEmail({
         to: ordine.email,
         subject: "La tua richiesta è disponibile — completa l'ordine · Anna Shop",
-        text: `Ciao ${ordine.nome ?? ""},\n\nbuone notizie: gli articoli della tua richiesta sono disponibili! Completa il pagamento in sicurezza da questa pagina:\n\n${siteUrl}/ordine/${ordine.token}\n\nA presto,\nAnna Shop di Borracci Anna — ${NEGOZIO.indirizzoCompleto}`,
+        text: `Ciao ${ordine.nome ?? ""},\n\nbuone notizie: gli articoli della tua richiesta sono disponibili!\n\n${rigaSped}\nTotale: ${formatPrezzo(totaleCents)}\n\nCompleta il pagamento in sicurezza da questa pagina:\n\n${siteUrl}/ordine/${ordine.token}\n\nA presto,\nAnna Shop di Borracci Anna — ${NEGOZIO.indirizzoCompleto}`,
       });
     }
     return { ok: true };

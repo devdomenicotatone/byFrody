@@ -17,6 +17,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getStripe } from "@/lib/stripe";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import type { Json } from "@/lib/supabase/database.types";
 
 // Eventi che corrispondono a un pagamento andato a buon fine.
 const EVENTI_FINALIZZAZIONE = new Set<Stripe.Event["type"]>([
@@ -60,8 +61,33 @@ async function righeDaSessione(sessionId: string): Promise<RigaStock[]> {
 }
 
 /**
+ * Estrae l'indirizzo di spedizione scelto dal cliente, da persistere come jsonb.
+ * In Checkout one-time i dati arrivano in collected_information.shipping_details
+ * (popolato perche shipping_address_collection e attivo). null se assente.
+ */
+function indirizzoDaSessione(session: Stripe.Checkout.Session): Json {
+  const dettagli = session.collected_information?.shipping_details ?? null;
+  if (!dettagli) return null;
+  const a = dettagli.address;
+  return {
+    nome: dettagli.name ?? null,
+    indirizzo: a
+      ? {
+          line1: a.line1 ?? null,
+          line2: a.line2 ?? null,
+          cap: a.postal_code ?? null,
+          citta: a.city ?? null,
+          provincia: a.state ?? null,
+          paese: a.country ?? null,
+        }
+      : null,
+  };
+}
+
+/**
  * Finalizza una sessione di checkout pagata: delega alla RPC atomica/idempotente
- * che segna l'ordine "pagato" e decrementa lo stock una sola volta.
+ * che segna l'ordine "pagato", decrementa lo stock una sola volta e salva costo
+ * di spedizione (session.shipping_cost) e indirizzo nella stessa transazione.
  */
 async function finalizzaOrdine(
   supabase: SupabaseClient,
@@ -74,6 +100,9 @@ async function finalizzaOrdine(
     p_email: session.customer_details?.email ?? null,
     p_total: session.amount_total ?? 0,
     p_righe: righe,
+    // shipping_cost.amount_total = costo della tariffa scelta dal cliente.
+    p_shipping_cents: session.shipping_cost?.amount_total ?? null,
+    p_indirizzo: indirizzoDaSessione(session),
   });
   if (error) {
     throw new Error(`Finalizzazione ordine fallita: ${error.message}`);
